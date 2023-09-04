@@ -1,7 +1,7 @@
 # golangci.com configuration
 # https://github.com/golangci/golangci/wiki/Configuration
 service:
-  golangci-lint-version: 1.50.0 # use the fixed version to not introduce new linters unexpectedly
+  golangci-lint-version: 1.52.0 # use the fixed version to not introduce new linters unexpectedly
 
 linters-settings:
   govet:
@@ -25,12 +25,6 @@ linters-settings:
   goconst:
     min-len: 2
     min-occurrences: 2
-  depguard:
-    list-type: blacklist
-    packages:
-      # logging is allowed only by logutils.Log, logrus
-      # is allowed to use only in logutils package
-      - github.com/sirupsen/logrus
   misspell:
     locale: US
     auto-fix: true
@@ -74,14 +68,12 @@ linters:
     - misspell
     - noctx
     - stylecheck
-    - whitespace
-    - wsl
     - gosec
   enable-all: false
   disable-all: true
 
 run:
-#  build-tags:
+  #  build-tags:
   skip-dirs:
     - internal/fixtures
 
@@ -117,5 +109,3 @@ issues:
     # EXC0010 gosec: False positive is triggered by 'src, err := ioutil.ReadFile(filename)'
     - Potential file inclusion via variable
 exclude-use-default: false
-
-
