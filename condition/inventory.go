@@ -1,0 +1,42 @@
+package condition
+
+import (
+	"github.com/google/uuid"
+)
+
+type InventoryMethod string
+
+const (
+	// Condition kind
+	Inventory Kind = "inventory"
+
+	// Inventory methods
+	InbandInventory    InventoryMethod = "inband"
+	OutofbandInventory InventoryMethod = "outofband"
+)
+
+// InventoryTaskParameters are the parameters set for an inventory collection condition
+//
+// nolint:govet // prefer readability over fieldalignment for this case
+type InventoryTaskParameters struct {
+	// CollectBiosCfg defaults to true
+	CollectBiosCfg bool `json:"collect_bios_cfg"`
+
+	// CollectFirmwareStatus defaults to true
+	CollectFirwmareStatus bool `json:"collect_firmware_status"`
+
+	// Method defaults to Outofband
+	Method InventoryMethod `json:"inventory_method"`
+
+	// Asset identifier.
+	AssetID uuid.UUID `json:"asset_id"`
+}
+
+func NewInventoryTaskParameters(assetID uuid.UUID, method InventoryMethod, collectFirmwareStatus, collectBiosCfg bool) *InventoryTaskParameters {
+	return &InventoryTaskParameters{
+		AssetID:               assetID,
+		CollectBiosCfg:        collectBiosCfg,
+		CollectFirwmareStatus: collectFirmwareStatus,
+		Method:                method,
+	}
+}
