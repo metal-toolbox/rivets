@@ -128,8 +128,7 @@ func ConditionStatus(conditionID, facilityCode, kvBucket string, js nats.JetStre
 		return Indeterminate, newErrQueryStatus(errJSON, kvBucket, lookupKey, "")
 	}
 
-	if condition.State(sv.State) == condition.Failed ||
-		condition.State(sv.State) == condition.Succeeded {
+	if condition.StateIsComplete(condition.State(sv.State)) {
 		return Complete, nil
 	}
 
