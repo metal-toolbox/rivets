@@ -19,6 +19,12 @@ type FirmwareInstallTaskParameters struct {
 	// Force install given firmware regardless of current firmware version.
 	ForceInstall bool `json:"force_install,omitempty"`
 
+	// When defined, flasher will not perform any disruptive actions on the asset,
+	// it will download the firmware to be installed and determine if the firmware is applicable for the device.
+	//
+	// No firmware installs will be attempted and if the device is powered off, it will not be powered on.
+	DryRun bool `json:"dry_run,omitempty"`
+
 	// Task priority is the task priority between 0 and 3
 	// where 0 is the default and 3 is the max.
 	//
