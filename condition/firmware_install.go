@@ -11,13 +11,13 @@ const (
 // nolint:govet // fieldalignment struct is easier to read in the current format
 type FirmwareInstallTaskParameters struct {
 	// Inventory identifier for the asset to install firmware on.
-	AssetID uuid.UUID `json:"assetID"`
+	AssetID uuid.UUID `json:"asset_id"`
 
 	// Reset device BMC before firmware install
-	ResetBMCBeforeInstall bool `json:"resetBMCBeforeInstall,omitempty"`
+	ResetBMCBeforeInstall bool `json:"reset_bmc_before_install,omitempty"`
 
 	// Force install given firmware regardless of current firmware version.
-	ForceInstall bool `json:"forceInstall,omitempty"`
+	ForceInstall bool `json:"force_install,omitempty"`
 
 	// Task priority is the task priority between 0 and 3
 	// where 0 is the default and 3 is the max.
@@ -32,7 +32,7 @@ type FirmwareInstallTaskParameters struct {
 	Firmwares []Firmware `json:"firmwares,omitempty"`
 
 	// FirmwareSetID specifies the firmware set to be applied.
-	FirmwareSetID uuid.UUID `json:"firmwareSetID,omitempty"`
+	FirmwareSetID uuid.UUID `json:"firmware_set_id,omitempty"`
 }
 
 // Firmware holds attributes for a firmware object
