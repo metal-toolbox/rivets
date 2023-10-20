@@ -102,6 +102,9 @@ type Condition struct {
 	// Version identifies the revision number for this struct.
 	Version string `json:"version"`
 
+	// Client is the user/jwt user that requested the condition.
+	Client string `json:"client"`
+
 	// ID is the identifier for this condition.
 	ID uuid.UUID `json:"id"`
 
