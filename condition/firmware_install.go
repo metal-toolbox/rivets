@@ -29,6 +29,10 @@ type FirmwareInstallTaskParameters struct {
 	// No firmware installs will be attempted and if the device is powered off, it will not be powered on.
 	DryRun bool `json:"dry_run,omitempty"`
 
+	// When true, flasher will expect the host to be powered off before proceeding,
+	// if the host is not already powered off - the install task will be failed.
+	RequireHostPoweredOff bool `json:"request_host_powered_off,omitempty"`
+
 	// Task priority is the task priority between 0 and 3
 	// where 0 is the default and 3 is the max.
 	//
