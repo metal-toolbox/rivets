@@ -27,7 +27,7 @@ type FirmwareInstallTaskParameters struct {
 
 	// When true, flasher will expect the host to be powered off before proceeding,
 	// if the host is not already powered off - the install task will be failed.
-	RequireHostPoweredOff bool `json:"request_host_powered_off,omitempty"`
+	RequireHostPoweredOff bool `json:"require_host_powered_off,omitempty"`
 
 	// Task priority is the task priority between 0 and 3
 	// where 0 is the default and 3 is the max.
