@@ -1,6 +1,10 @@
 package condition
 
-import "github.com/google/uuid"
+import (
+	"encoding/json"
+
+	"github.com/google/uuid"
+)
 
 const (
 	FirmwareInstall Kind = "firmwareInstall"
@@ -41,14 +45,22 @@ type FirmwareInstallTaskParameters struct {
 	FirmwareSetID uuid.UUID `json:"firmware_set_id,omitempty"`
 }
 
+func (p *FirmwareInstallTaskParameters) MustJSON() []byte {
+	byt, err := json.Marshal(p)
+	if err != nil {
+		panic(err)
+	}
+	return byt
+}
+
 // Firmware holds attributes for a firmware object
 type Firmware struct {
-	ID        string   `yaml:"id"`
-	Vendor    string   `yaml:"vendor"`
-	FileName  string   `yaml:"filename"`
-	Version   string   `yaml:"version"`
-	URL       string   `yaml:"URL"`
-	Component string   `yaml:"component"`
-	Checksum  string   `yaml:"checksum"`
-	Models    []string `yaml:"models"`
+	ID        string   `yaml:"id" json:"id"`
+	Vendor    string   `yaml:"vendor" json:"vendor"`
+	FileName  string   `yaml:"filename" json:"filename"`
+	Version   string   `yaml:"version" json:"version"`
+	URL       string   `yaml:"URL" json:"URL"`
+	Component string   `yaml:"component" json:"component"`
+	Checksum  string   `yaml:"checksum" json:"checksum"`
+	Models    []string `yaml:"models" json:"models"`
 }
