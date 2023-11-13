@@ -1,6 +1,8 @@
 package condition
 
 import (
+	"encoding/json"
+
 	"github.com/google/uuid"
 )
 
@@ -39,4 +41,22 @@ func NewInventoryTaskParameters(assetID uuid.UUID, method InventoryMethod, colle
 		CollectFirwmareStatus: collectFirmwareStatus,
 		Method:                method,
 	}
+}
+
+func MustInventoryJSON(assetID uuid.UUID, method InventoryMethod, collectFirmwareStatus, collectBiosCfg bool) []byte {
+	p := &InventoryTaskParameters{
+		AssetID:               assetID,
+		CollectBiosCfg:        collectBiosCfg,
+		CollectFirwmareStatus: collectFirmwareStatus,
+		Method:                method,
+	}
+	byt, err := json.Marshal(p)
+	if err != nil {
+		panic(err)
+	}
+	return byt
+}
+
+func MustDefaultInventoryJSON(assetID uuid.UUID) []byte {
+	return MustInventoryJSON(assetID, OutofbandInventory, true, true)
 }
