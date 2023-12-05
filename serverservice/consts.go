@@ -16,6 +16,18 @@ const (
 	// Serverservice attribute namespace for outofband firmware information.
 	FirmwareVersionOutofbandNS = "sh.hollow.alloy.outofband.firmware"
 
+	// Serverservice attribute namespace for outofband bios configuration.
+	BiosConfigOutofbandNS = "sh.hollow.alloy.outofband.bios_configuration"
+
+	// Serverservice attribute namespace for inband bios configuration.
+	BiosConfigInbandNS = "sh.hollow.alloy.inband.bios_configuration"
+
+	// Serverservice attribute namespace for inband component attributes/metadata.
+	ComponentAttributeInbandNS = "sh.hollow.alloy.inband.metadata"
+
+	// Serverservice attribute namespace for outofband component attributes/metadata.
+	ComponentAttributeOutofbandNS = "sh.hollow.alloy.outofband.metadata"
+
 	// Serverservice attribute for installed firmware.
 	FirmwareVersionNSInstalledAttribute = "firmware.installed"
 
@@ -27,4 +39,7 @@ const (
 
 	// Serverservice attribute for component health status.
 	StatusNSHealthAttribute = "status.health"
+
+	// Serserverservice attribute for errors that occurred when connecting/collecting inventory from the bmc are stored here.
+	ServerNSBMCErrorsAttribute = "sh.hollow.alloy.outofband.server_bmc_errors"
 )
