@@ -1,51 +1,38 @@
-package serverservice
+package types
 
 import (
+	"time"
+
 	"github.com/bmc-toolbox/common"
-	"github.com/google/uuid"
 )
 
-// FirmwareVersionedAttribute holds component firmware information.
-type FirmwareVersionedAttribute struct {
-	Firmware *common.Firmware `json:"firmware,omitempty"`
-	UUID     *uuid.UUID       `json:"uuid,omitempty"` // UUID references firmware UUID identified in serverservice based on component/device attributes.
-	Vendor   string           `json:"vendor,omitempty"`
+type Component struct {
+	UpdatedAt  time.Time            `json:"updated,omitempty"`
+	Firmware   *common.Firmware     `json:"firmware,omitempty"`
+	Status     *common.Status       `json:"status,omitempty"`
+	Attributes *ComponentAttributes `json:"attributes,omitempty"`
+	Name       string               `json:"name,omitempty"`
+	Vendor     string               `json:"vendor,omitempty"`
+	Model      string               `json:"model,omitempty"`
+	Serial     string               `json:"serial,omitempty"`
 }
 
-// StatusVersionedAttribute holds component status information.
-type StatusVersionedAttribute struct {
-	Status        *common.Status `json:"status,omitempty"`
-	NICPortStatus *NICPortStatus `json:"nic_port_status,omitempty"`
-	SmartStatus   string         `json:"smart_status,omitempty"`
-}
-
-// NICPortStatus holds the NIC port status which includes the health status and link status information.
-type NICPortStatus struct {
-	*common.Status
-	ID                   string `json:"id,omitempty"`
-	MacAddress           string `json:"macaddress,omitempty"`
-	ActiveLinkTechnology string `json:"active_link_technology,omitempty"`
-	LinkStatus           string `json:"link_status,omitempty"`
-	MTUSize              int    `json:"mtu_size,omitempty"`
-	AutoSpeedNegotiation bool   `json:"autospeednegotiation,omitempty"`
-}
-
-type MetadataAttribute struct {
-	Data map[string]string `json:"metadata,omitempty"`
-}
-
-type ServerVendorAttribute struct {
-	Model  string `json:"model"`
-	Vendor string `json:"vendor"`
-	Serial string `json:"serial"`
-}
-
-type BMCAttribute struct {
-	Address string `json:"address"`
+type Server struct {
+	UpdatedAt  time.Time         `json:"updated,omitempty"`
+	BIOSCfg    map[string]string `json:"bios_cfg,omitempty"`
+	ID         string            `json:"id,omitempty"`
+	Facility   string            `json:"facility,omitempty"`
+	Name       string            `json:"name,omitempty"`
+	BMCAddress string            `json:"bmc_address,omitempty"`
+	Vendor     string            `json:"vendor,omitempty"`
+	Model      string            `json:"model,omitempty"`
+	Serial     string            `json:"serial,omitempty"`
+	Status     string            `json:"status,omitempty"`
+	Components []*Component      `json:"components,omitempty"`
 }
 
 // ComponentAtributes are generic component attributes
-type ComponentCommonAttributes struct {
+type ComponentAttributes struct {
 	Capabilities                 []*common.Capability `json:"capabilities,omitempty"`
 	Metadata                     map[string]string    `json:"metadata,omitempty"`
 	ID                           string               `json:"id,omitempty"`
