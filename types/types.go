@@ -6,7 +6,9 @@ import (
 	"github.com/bmc-toolbox/common"
 )
 
+// Component is a generic server component type
 type Component struct {
+	ID         string               `json:"id,omitempty"`
 	UpdatedAt  time.Time            `json:"updated,omitempty"`
 	Firmware   *common.Firmware     `json:"firmware,omitempty"`
 	Status     *common.Status       `json:"status,omitempty"`
@@ -17,18 +19,21 @@ type Component struct {
 	Serial     string               `json:"serial,omitempty"`
 }
 
+// Server is a generic server  type
 type Server struct {
-	UpdatedAt  time.Time         `json:"updated,omitempty"`
-	BIOSCfg    map[string]string `json:"bios_cfg,omitempty"`
-	ID         string            `json:"id,omitempty"`
-	Facility   string            `json:"facility,omitempty"`
-	Name       string            `json:"name,omitempty"`
-	BMCAddress string            `json:"bmc_address,omitempty"`
-	Vendor     string            `json:"vendor,omitempty"`
-	Model      string            `json:"model,omitempty"`
-	Serial     string            `json:"serial,omitempty"`
-	Status     string            `json:"status,omitempty"`
-	Components []*Component      `json:"components,omitempty"`
+	UpdatedAt   time.Time         `json:"updated,omitempty"`
+	BIOSCfg     map[string]string `json:"bios_cfg,omitempty"`
+	ID          string            `json:"id,omitempty"`
+	Facility    string            `json:"facility,omitempty"`
+	Name        string            `json:"name,omitempty"`
+	BMCAddress  string            `json:"bmc_address,omitempty"`
+	BMCUser     string            `json:"bmc_user,omitempty"`
+	BMCPassword string            `json:"bmc_password,omitempty"`
+	Vendor      string            `json:"vendor,omitempty"`
+	Model       string            `json:"model,omitempty"`
+	Serial      string            `json:"serial,omitempty"`
+	Status      string            `json:"status,omitempty"`
+	Components  []*Component      `json:"components,omitempty"`
 }
 
 // ComponentAtributes are generic component attributes
