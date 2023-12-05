@@ -21,7 +21,7 @@ const (
 	ConditionUpdateEvent events.EventType = "update"
 
 	// ConditionStructVersion identifies the condition struct revision
-	ConditionStructVersion string = "1"
+	ConditionStructVersion string = "1.1"
 )
 
 // State is the state value of a Condition
@@ -135,11 +135,6 @@ type Condition struct {
 
 	// Fault is used to introduce faults into the controller when executing on a condition.
 	Fault *Fault `json:"fault,omitempty"`
-
-	// ResourceVersion has to be set to the value received by the
-	// client updating it, this it to make sure condition updates
-	// occur in the expected order.
-	ResourceVersion int64 `json:"resourceVersion"`
 
 	// UpdatedAt is when this object was last updated.
 	UpdatedAt time.Time `json:"updatedAt,omitempty"`
