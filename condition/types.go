@@ -77,8 +77,6 @@ type Parameters interface {
 // Definition holds the default parameters for a Condition.
 type Definition struct {
 	Kind                  Kind `mapstructure:"kind"`
-	OnSuccessCondition    Kind `mapstructure:"onSuccessCondition"`
-	Exclusive             bool `mapstructure:"exclusive"`
 	FailOnCheckpointError bool `mapstructure:"failOnCheckpointError"`
 }
 
@@ -122,16 +120,9 @@ type Condition struct {
 	// reconciling the condition and the client requesting the condition.
 	Status json.RawMessage `json:"status,omitempty"`
 
-	// OnSuccess execute another condition when defined
-	// OnSuccess *Condition `json:"onSuccess,omitempty"`
-
 	// Should the worker executing this condition fail if its unable to checkpoint
 	// the status of work on this condition.
 	FailOnCheckpointError bool `json:"failOnCheckpointError,omitempty"`
-
-	// Exclusive indicates this condition holds exclusive access to the device
-	// and other conditions have to wait until this is in a finalized state.
-	Exclusive bool `json:"exclusive,omitempty"`
 
 	// Fault is used to introduce faults into the controller when executing on a condition.
 	Fault *Fault `json:"fault,omitempty"`
