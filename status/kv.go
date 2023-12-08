@@ -52,15 +52,14 @@ const (
 
 // StatusValue is the canonical structure for reporting status of an ongoing task
 type StatusValue struct {
-	UpdatedAt       time.Time       `json:"updated"`
-	WorkerID        string          `json:"worker"`
-	Target          string          `json:"target"`
-	TraceID         string          `json:"traceID"`
-	SpanID          string          `json:"spanID"`
-	State           string          `json:"state"`
-	Status          json.RawMessage `json:"status"`
-	ResourceVersion int64           `json:"resourceVersion"` // for updates to server-service
-	MsgVersion      int32           `json:"msgVersion"`
+	UpdatedAt  time.Time       `json:"updated"`
+	WorkerID   string          `json:"worker"`
+	Target     string          `json:"target"`
+	TraceID    string          `json:"traceID"`
+	SpanID     string          `json:"spanID"`
+	State      string          `json:"state"`
+	Status     json.RawMessage `json:"status"`
+	MsgVersion int32           `json:"msgVersion"`
 	// WorkSpec json.RawMessage `json:"spec"` XXX: for re-publish use-cases
 }
 
