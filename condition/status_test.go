@@ -1,4 +1,4 @@
-package status
+package condition
 
 //nolint:all // test file
 
@@ -10,7 +10,6 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/metal-toolbox/flasher/types"
-	"github.com/metal-toolbox/rivets/condition"
 	"github.com/nats-io/nats-server/v2/server"
 	srvtest "github.com/nats-io/nats-server/v2/test"
 	"github.com/nats-io/nats.go"
@@ -108,7 +107,7 @@ func TestConditionStatus(t *testing.T) {
 			Complete,
 			"",
 			func() []byte {
-				sv := &types.StatusValue{State: string(condition.Failed)}
+				sv := &types.StatusValue{State: string(Failed)}
 				return sv.MustBytes()
 			},
 			false,
@@ -119,7 +118,7 @@ func TestConditionStatus(t *testing.T) {
 			"bad worker ID",
 			func() []byte {
 				sv := &StatusValue{
-					State:    string(condition.Pending),
+					State:    string(Pending),
 					WorkerID: "some junk id",
 				}
 
@@ -140,7 +139,7 @@ func TestConditionStatus(t *testing.T) {
 				require.NoError(t, err, "register test controller")
 
 				sv := &StatusValue{
-					State:    string(condition.Pending),
+					State:    string(Pending),
 					WorkerID: workerRegistryID.String(),
 				}
 				return sv.MustBytes()
@@ -157,7 +156,7 @@ func TestConditionStatus(t *testing.T) {
 				require.NoError(t, err, "deregister controller")
 
 				sv := &StatusValue{
-					State:    string(condition.Pending),
+					State:    string(Pending),
 					WorkerID: workerRegistryID.String(),
 				}
 				return sv.MustBytes()

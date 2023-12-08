@@ -1,4 +1,4 @@
-package status
+package condition
 
 import (
 	"encoding/json"
@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/metal-toolbox/flasher/types"
-	"github.com/metal-toolbox/rivets/condition"
 	"github.com/nats-io/nats.go"
 	"github.com/pkg/errors"
 	"go.hollow.sh/toolbox/events/registry"
@@ -127,7 +126,7 @@ func ConditionStatus(conditionID, facilityCode, kvBucket string, js nats.JetStre
 		return Indeterminate, newErrQueryStatus(errJSON, kvBucket, lookupKey, "")
 	}
 
-	if condition.StateIsComplete(condition.State(sv.State)) {
+	if StateIsComplete(State(sv.State)) {
 		return Complete, nil
 	}
 
