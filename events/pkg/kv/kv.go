@@ -1,4 +1,4 @@
-//nolint:wsl
+//nolint:wsl // useless
 package kv
 
 import (

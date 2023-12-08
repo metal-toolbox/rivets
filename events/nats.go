@@ -1,11 +1,10 @@
-//nolint:wsl
+//nolint:wsl // useless
 package events
 
 import (
 	"context"
 	"log"
 	"reflect"
-	"strings"
 	"time"
 
 	"github.com/hashicorp/go-multierror"
@@ -284,11 +283,7 @@ func (n *NatsJetstream) Publish(ctx context.Context, subjectSuffix string, data 
 		nats.RetryAttempts(-1),
 	}
 
-	fullSubject := strings.Join(
-		[]string{
-			n.parameters.PublisherSubjectPrefix,
-			subjectSuffix,
-		}, ".")
+	fullSubject := n.parameters.PublisherSubjectPrefix + "." + subjectSuffix
 
 	msg := nats.NewMsg(fullSubject)
 	msg.Data = data

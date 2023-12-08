@@ -1,6 +1,6 @@
-package kv
+package status
 
-// nolint // test file
+//nolint:all // test file
 
 import (
 	"fmt"

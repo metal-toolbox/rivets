@@ -4,7 +4,7 @@
 // will be reaped by the system, making it easy to determine which workers are
 // active.
 //
-//nolint:wsl
+//nolint:wsl // useless
 package registry
 
 import (
