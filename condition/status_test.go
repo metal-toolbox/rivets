@@ -56,7 +56,7 @@ func shutdownJetStream(t *testing.T, s *server.Server) {
 	s.WaitForShutdown()
 }
 
-func TestConditionStatus(t *testing.T) {
+func TestCheckConditionInProgress(t *testing.T) {
 	srv := startJetStreamServer(t)
 	defer shutdownJetStream(t, srv)
 	nc, js := jetStreamContext(t, srv)
@@ -174,7 +174,7 @@ func TestConditionStatus(t *testing.T) {
 				}
 			}
 
-			gotState, err := ConditionStatus(conditionID.String(), facilityCode, testKvBucket, js)
+			gotState, err := CheckConditionInProgress(conditionID.String(), facilityCode, testKvBucket, js)
 			if tt.expectErrorContains != "" {
 				assert.ErrorContains(t, err, tt.expectErrorContains)
 				return

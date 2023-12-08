@@ -95,10 +95,10 @@ const (
 	Indeterminate           // we got an error in the process of making the check
 )
 
-// ConditionStatus returns the status of the task from the KV store
+// CheckConditionInProgress returns the status of the task from the KV store
 //
 //nolint:gocyclo // status checks are cyclomatic
-func ConditionStatus(conditionID, facilityCode, kvBucket string, js nats.JetStreamContext) (TaskState, error) {
+func CheckConditionInProgress(conditionID, facilityCode, kvBucket string, js nats.JetStreamContext) (TaskState, error) {
 	handle, err := js.KeyValue(kvBucket)
 	if err != nil {
 		errKV := errors.Wrap(err, "bind to status KV bucket for condition lookup failed")
