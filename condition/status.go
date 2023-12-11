@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/metal-toolbox/rivets/events/registry"
 	"github.com/nats-io/nats.go"
 	"github.com/pkg/errors"
-	"go.hollow.sh/toolbox/events/registry"
 )
 
 type ErrQueryStatus struct {
