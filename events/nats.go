@@ -41,7 +41,7 @@ var (
 )
 
 const (
-	consumerMaxDeliver = -1
+	consumerMaxDeliver = 5
 	consumerAckPolicy  = nats.AckExplicitPolicy
 )
 
@@ -209,8 +209,8 @@ func (n *NatsJetstream) addConsumer() error {
 	// https://pkg.go.dev/github.com/nats-io/nats.go#ConsumerConfig
 	cfg := &nats.ConsumerConfig{
 		Durable:       n.parameters.Consumer.Name,
-		MaxDeliver:    -1,
-		AckPolicy:     nats.AckExplicitPolicy,
+		MaxDeliver:    consumerMaxDeliver,
+		AckPolicy:     consumerAckPolicy,
 		AckWait:       n.parameters.Consumer.AckWait,
 		MaxAckPending: n.parameters.Consumer.MaxAckPending,
 		DeliverPolicy: nats.DeliverAllPolicy,
