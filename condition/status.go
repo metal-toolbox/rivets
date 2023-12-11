@@ -1,4 +1,4 @@
-package kv
+package condition
 
 import (
 	"encoding/json"
@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/metal-toolbox/flasher/types"
-	"github.com/metal-toolbox/rivets/condition"
 	"github.com/nats-io/nats.go"
 	"github.com/pkg/errors"
 	"go.hollow.sh/toolbox/events/registry"
@@ -52,15 +51,14 @@ const (
 
 // StatusValue is the canonical structure for reporting status of an ongoing task
 type StatusValue struct {
-	UpdatedAt       time.Time       `json:"updated"`
-	WorkerID        string          `json:"worker"`
-	Target          string          `json:"target"`
-	TraceID         string          `json:"traceID"`
-	SpanID          string          `json:"spanID"`
-	State           string          `json:"state"`
-	Status          json.RawMessage `json:"status"`
-	ResourceVersion int64           `json:"resourceVersion"` // for updates to server-service
-	MsgVersion      int32           `json:"msgVersion"`
+	UpdatedAt  time.Time       `json:"updated"`
+	WorkerID   string          `json:"worker"`
+	Target     string          `json:"target"`
+	TraceID    string          `json:"traceID"`
+	SpanID     string          `json:"spanID"`
+	State      string          `json:"state"`
+	Status     json.RawMessage `json:"status"`
+	MsgVersion int32           `json:"msgVersion"`
 	// WorkSpec json.RawMessage `json:"spec"` XXX: for re-publish use-cases
 }
 
@@ -97,10 +95,10 @@ const (
 	Indeterminate           // we got an error in the process of making the check
 )
 
-// ConditionStatus returns the status of the task from the KV store
+// CheckConditionInProgress returns the status of the task from the KV store
 //
 //nolint:gocyclo // status checks are cyclomatic
-func ConditionStatus(conditionID, facilityCode, kvBucket string, js nats.JetStreamContext) (TaskState, error) {
+func CheckConditionInProgress(conditionID, facilityCode, kvBucket string, js nats.JetStreamContext) (TaskState, error) {
 	handle, err := js.KeyValue(kvBucket)
 	if err != nil {
 		errKV := errors.Wrap(err, "bind to status KV bucket for condition lookup failed")
@@ -128,7 +126,7 @@ func ConditionStatus(conditionID, facilityCode, kvBucket string, js nats.JetStre
 		return Indeterminate, newErrQueryStatus(errJSON, kvBucket, lookupKey, "")
 	}
 
-	if condition.StateIsComplete(condition.State(sv.State)) {
+	if StateIsComplete(State(sv.State)) {
 		return Complete, nil
 	}
 
