@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/metal-toolbox/flasher/types"
 	"github.com/nats-io/nats-server/v2/server"
 	srvtest "github.com/nats-io/nats-server/v2/test"
 	"github.com/nats-io/nats.go"
@@ -107,7 +106,7 @@ func TestCheckConditionInProgress(t *testing.T) {
 			Complete,
 			"",
 			func() []byte {
-				sv := &types.StatusValue{State: string(Failed)}
+				sv := &StatusValue{State: string(Failed)}
 				return sv.MustBytes()
 			},
 			false,

@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/metal-toolbox/flasher/types"
 	"github.com/nats-io/nats.go"
 	"github.com/pkg/errors"
 	"go.hollow.sh/toolbox/events/registry"
@@ -120,7 +119,7 @@ func CheckConditionInProgress(conditionID, facilityCode, kvBucket string, js nat
 	}
 
 	// we have an status entry for this condition, is is complete?
-	sv := types.StatusValue{}
+	sv := StatusValue{}
 	if errJSON := json.Unmarshal(entry.Value(), &sv); errJSON != nil {
 		errJSON = errors.Wrap(errJSON, "unable to construct a sane status for condition")
 		return Indeterminate, newErrQueryStatus(errJSON, kvBucket, lookupKey, "")
