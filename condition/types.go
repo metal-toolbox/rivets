@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"go.hollow.sh/toolbox/events"
+	"github.com/metal-toolbox/rivets/events"
 
 	"golang.org/x/exp/slices"
 )

@@ -9,15 +9,14 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/metal-toolbox/flasher/types"
+	"github.com/metal-toolbox/rivets/events"
+	"github.com/metal-toolbox/rivets/events/pkg/kv"
+	"github.com/metal-toolbox/rivets/events/registry"
 	"github.com/nats-io/nats-server/v2/server"
 	srvtest "github.com/nats-io/nats-server/v2/test"
 	"github.com/nats-io/nats.go"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"go.hollow.sh/toolbox/events"
-	"go.hollow.sh/toolbox/events/pkg/kv"
-	"go.hollow.sh/toolbox/events/registry"
 )
 
 func startJetStreamServer(t *testing.T) *server.Server {
@@ -107,7 +106,7 @@ func TestCheckConditionInProgress(t *testing.T) {
 			Complete,
 			"",
 			func() []byte {
-				sv := &types.StatusValue{State: string(Failed)}
+				sv := &StatusValue{State: string(Failed)}
 				return sv.MustBytes()
 			},
 			false,
