@@ -55,7 +55,6 @@ func ConvertComponents(cs []ss.ServerComponent) []*rt.Component {
 			case FirmwareVersionInbandNS, FirmwareVersionOutofbandNS:
 				fw := &FirmwareVersionedAttribute{}
 				if err := UnpackVersionedAttribute(&vattr, fw); err == nil {
-
 					component.Firmware = fw.Firmware
 				}
 
@@ -65,7 +64,6 @@ func ConvertComponents(cs []ss.ServerComponent) []*rt.Component {
 					component.Status = st.Status
 				}
 			}
-
 		}
 
 		for _, attr := range c.Attributes {
