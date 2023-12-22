@@ -22,6 +22,9 @@ const (
 	// Serverservice attribute namespace for inband bios configuration.
 	BiosConfigInbandNS = "sh.hollow.alloy.inband.bios_configuration"
 
+	// UEFI varsiables namespace
+	UEFIVarsNS = "sh.hollow.alloy.uefi_vars"
+
 	// Serverservice attribute namespace for inband component attributes/metadata.
 	ComponentAttributeInbandNS = "sh.hollow.alloy.inband.metadata"
 
