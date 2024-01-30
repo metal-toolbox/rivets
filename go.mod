@@ -4,7 +4,7 @@ go 1.20
 
 require (
 	github.com/bmc-toolbox/common v0.0.0-20230717121556-5eb9915a8a5a
-	github.com/google/uuid v1.3.1
+	github.com/google/uuid v1.6.0
 	github.com/hashicorp/go-multierror v1.1.1
 	github.com/nats-io/nats-server/v2 v2.10.7
 	github.com/nats-io/nats.go v1.31.0
