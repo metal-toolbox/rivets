@@ -9,6 +9,7 @@ import (
 	"github.com/google/uuid"
 	ss "github.com/metal-toolbox/fleetdb/pkg/api/v1"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestConvertComponents(t *testing.T) {
@@ -117,4 +118,128 @@ func TestConvertComponents(t *testing.T) {
 
 	assert.NotNil(t, result[0].Status)
 	assert.Equal(t, "ok", result[0].Status.State)
+}
+
+func TestRecordToComponent(t *testing.T) {
+	t.Parallel()
+	// test that the base transformations work properly
+	t.Run("no variable attributes", func(t *testing.T) {
+		t.Parallel()
+
+		record := &ss.ServerComponent{
+			UUID:                uuid.New(),
+			ServerUUID:          uuid.New(),
+			Name:                "BIOS",
+			Vendor:              "Dell",
+			Model:               "Version X",
+			Serial:              "DEF789",
+			Attributes:          []ss.Attributes{},
+			VersionedAttributes: []ss.VersionedAttributes{},
+			ComponentTypeName:   "BIOS",
+			ComponentTypeSlug:   "bios",
+			CreatedAt:           time.Now(),
+			UpdatedAt:           time.Now(),
+		}
+
+		got, err := RecordToComponent(record)
+		require.NoError(t, err)
+		require.Equal(t, record.UUID.String(), got.ID)
+		require.Equal(t, record.ComponentTypeSlug, got.Name)
+		require.Equal(t, record.Vendor, got.Vendor)
+		require.Equal(t, record.Model, got.Model)
+		require.Equal(t, record.Serial, got.Serial)
+		require.Equal(t, record.UpdatedAt, got.UpdatedAt)
+	})
+	t.Run("out-of-band populates empty fields", func(t *testing.T) {
+		t.Parallel()
+		record := &ss.ServerComponent{
+			UUID:       uuid.New(),
+			ServerUUID: uuid.New(),
+			Name:       "BIOS",
+			Vendor:     "Dell",
+			Model:      "Version X",
+			Serial:     "DEF789",
+			Attributes: []ss.Attributes{},
+			VersionedAttributes: []ss.VersionedAttributes{
+				{
+					Namespace: FirmwareVersionOutofbandNS,
+					Data:      json.RawMessage(`{"firmware": {"installed": "1.2.3"}}`),
+				},
+				{
+					Namespace: StatusOutofbandNS,
+					Data:      json.RawMessage(`{"status": {"state": "ok"}}`),
+				},
+			},
+			ComponentTypeID:   "bios-type",
+			ComponentTypeName: "BIOS",
+			ComponentTypeSlug: "bios",
+			CreatedAt:         time.Now(),
+			UpdatedAt:         time.Now(),
+		}
+
+		got, err := RecordToComponent(record)
+		require.NoError(t, err)
+		require.Equal(t, "1.2.3", got.Firmware.Installed)
+		require.Equal(t, "ok", got.Status.State)
+	})
+	t.Run("in-band trumps out-of-band", func(t *testing.T) {
+		t.Parallel()
+		record := &ss.ServerComponent{
+			UUID:       uuid.New(),
+			ServerUUID: uuid.New(),
+			Name:       "BIOS",
+			Vendor:     "Dell",
+			Model:      "Version X",
+			Serial:     "DEF789",
+			Attributes: []ss.Attributes{},
+			VersionedAttributes: []ss.VersionedAttributes{
+				{
+					Namespace: FirmwareVersionOutofbandNS,
+					Data:      json.RawMessage(`{"firmware": {"installed": "1.2.3"}}`),
+				},
+				{
+					Namespace: StatusOutofbandNS,
+					Data:      json.RawMessage(`{"status": {"state": "ok"}}`),
+				},
+				{
+					Namespace: FirmwareVersionInbandNS,
+					Data:      json.RawMessage(`{"firmware": {"installed": "1.2.3-45"}}`),
+				},
+				{
+					Namespace: StatusInbandNS,
+					Data:      json.RawMessage(`{"status": {"state": "ok, but could be better"}}`),
+				},
+			},
+			ComponentTypeID:   "bios-type",
+			ComponentTypeName: "BIOS",
+			ComponentTypeSlug: "bios",
+			CreatedAt:         time.Now(),
+			UpdatedAt:         time.Now(),
+		}
+
+		got, err := RecordToComponent(record)
+		require.NoError(t, err)
+		require.Equal(t, "1.2.3-45", got.Firmware.Installed)
+		require.Equal(t, "ok, but could be better", got.Status.State)
+	})
+	t.Run("malformed variable attribute returns an error", func(t *testing.T) {
+		t.Parallel()
+		record := &ss.ServerComponent{
+			UUID:       uuid.New(),
+			ServerUUID: uuid.New(),
+			Name:       "BIOS",
+			Vendor:     "Dell",
+			Model:      "Version X",
+			Serial:     "DEF789",
+			Attributes: []ss.Attributes{},
+			VersionedAttributes: []ss.VersionedAttributes{
+				{
+					Namespace: FirmwareVersionOutofbandNS,
+					Data:      json.RawMessage(`{"firmware": {"installed": 1.2.3}}`),
+				},
+			},
+		}
+		_, err := RecordToComponent(record)
+		require.ErrorIs(t, err, errBadVAttr)
+	})
 }
