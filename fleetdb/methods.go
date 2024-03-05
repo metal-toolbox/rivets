@@ -1,12 +1,12 @@
-package serverservice
+package fleetdb
 
 import (
 	"encoding/json"
 	"sort"
 
+	ss "github.com/metal-toolbox/fleetdb/pkg/api/v1"
 	rt "github.com/metal-toolbox/rivets/types"
 	"github.com/pkg/errors"
-	ss "go.hollow.sh/serverservice/pkg/api/v1"
 )
 
 func UnpackVersionedAttribute(attr *ss.VersionedAttributes, dst any) error {

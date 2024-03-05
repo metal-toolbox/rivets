@@ -1,4 +1,4 @@
-package serverservice
+package fleetdb
 
 import (
 	"encoding/json"
@@ -7,8 +7,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	ss "github.com/metal-toolbox/fleetdb/pkg/api/v1"
 	"github.com/stretchr/testify/assert"
-	ss "go.hollow.sh/serverservice/pkg/api/v1"
 )
 
 func TestConvertComponents(t *testing.T) {
