@@ -9,24 +9,83 @@ import (
 	"github.com/pkg/errors"
 )
 
+var (
+	errBadVAttr = errors.New("unable to deserialize versioned attribute")
+	errBadAttr  = errors.New("unable to deserialize attribute")
+)
+
 func UnpackVersionedAttribute(attr *ss.VersionedAttributes, dst any) error {
-	derr := errors.New("error deserializing versioned attribute")
 	err := json.Unmarshal(attr.Data, dst)
 	if err != nil {
-		return errors.Wrap(derr, err.Error())
+		return errors.Wrap(errBadVAttr, err.Error())
 	}
 
 	return nil
 }
 
 func UnpackAttribute(attr *ss.Attributes, dst any) error {
-	derr := errors.New("error deserializing attribute")
 	err := json.Unmarshal(attr.Data, dst)
 	if err != nil {
-		return errors.Wrap(derr, err.Error())
+		return errors.Wrap(errBadAttr, err.Error())
 	}
 
 	return nil
+}
+
+// RecordToComponent takes a single incoming FleetDB component record and creates
+// a rivets Component from it. An important difference from ConvertComponents (cf.
+// below) is that this sets a given attribute/variable attribute preferentially
+// from in-band data, using out-of-band only when there is no in-band inventory.
+// We find that in-band inventory data is more complete, especially for SuperMicro.
+// The only attributes returned here are firmware-version, and status. We skip
+// reporting metadata (often a long list of capabilities).
+func RecordToComponent(rec *ss.ServerComponent) (*rt.Component, error) {
+	component := &rt.Component{
+		ID:        rec.UUID.String(),
+		Name:      rec.ComponentTypeSlug,
+		Vendor:    rec.Vendor,
+		Model:     rec.Model,
+		Serial:    rec.Serial,
+		UpdatedAt: rec.UpdatedAt,
+	}
+
+	for _, va := range rec.VersionedAttributes {
+		va := va
+		// the following relies on the knowledge that we'll get only the latest
+		// versioned attributes from FleetDB. XXX: Validate me!
+		switch va.Namespace {
+		case FirmwareVersionInbandNS:
+			fwva := &FirmwareVersionedAttribute{}
+			if err := UnpackVersionedAttribute(&va, fwva); err != nil {
+				return nil, err
+			}
+			component.Firmware = fwva.Firmware
+		case FirmwareVersionOutofbandNS:
+			if component.Firmware == nil {
+				fwva := &FirmwareVersionedAttribute{}
+				if err := UnpackVersionedAttribute(&va, fwva); err != nil {
+					return nil, err
+				}
+				component.Firmware = fwva.Firmware
+			}
+		case StatusInbandNS:
+			st := &StatusVersionedAttribute{}
+			if err := UnpackVersionedAttribute(&va, st); err != nil {
+				return nil, err
+			}
+			component.Status = st.Status
+		case StatusOutofbandNS:
+			if component.Status == nil {
+				st := &StatusVersionedAttribute{}
+				if err := UnpackVersionedAttribute(&va, st); err != nil {
+					return nil, err
+				}
+				component.Status = st.Status
+			}
+		}
+	}
+
+	return component, nil
 }
 
 // ConvertComponents converts Serverservice components to the rivets component type
