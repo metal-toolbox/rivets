@@ -1,4 +1,4 @@
-package serverservice
+package fleetdb
 
 const (
 	// Serverservice attribute namespace for device vendor, model, serial attributes.
