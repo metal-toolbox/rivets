@@ -37,8 +37,8 @@ func UnpackAttribute(attr *ss.Attributes, dst any) error {
 // below) is that this sets a given attribute/variable attribute preferentially
 // from in-band data, using out-of-band only when there is no in-band inventory.
 // We find that in-band inventory data is more complete, especially for SuperMicro.
-// The only attributes returned here are firmware-version, and status. We skip
-// reporting metadata (often a long list of capabilities).
+//
+//nolint:gocyclo,gocritic
 func RecordToComponent(rec *ss.ServerComponent) (*rt.Component, error) {
 	component := &rt.Component{
 		ID:        rec.UUID.String(),
@@ -52,7 +52,7 @@ func RecordToComponent(rec *ss.ServerComponent) (*rt.Component, error) {
 	for _, va := range rec.VersionedAttributes {
 		va := va
 		// the following relies on the knowledge that we'll get only the latest
-		// versioned attributes from FleetDB. XXX: Validate me!
+		// versioned attributes from FleetDB.
 		switch va.Namespace {
 		case FirmwareVersionInbandNS:
 			fwva := &FirmwareVersionedAttribute{}
@@ -82,6 +82,18 @@ func RecordToComponent(rec *ss.ServerComponent) (*rt.Component, error) {
 				}
 				component.Status = st.Status
 			}
+		}
+	}
+
+	for _, a := range rec.Attributes {
+		a := a // this doesn't need to be here after go 1.22
+		if a.Namespace == ComponentAttributeInbandNS {
+			attrs := &rt.ComponentAttributes{}
+			if err := UnpackAttribute(&a, attrs); err != nil {
+				return nil, err
+			}
+			component.Attributes = attrs
+			break
 		}
 	}
 
