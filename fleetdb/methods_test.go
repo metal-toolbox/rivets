@@ -127,13 +127,18 @@ func TestRecordToComponent(t *testing.T) {
 		t.Parallel()
 
 		record := &ss.ServerComponent{
-			UUID:                uuid.New(),
-			ServerUUID:          uuid.New(),
-			Name:                "BIOS",
-			Vendor:              "Dell",
-			Model:               "Version X",
-			Serial:              "DEF789",
-			Attributes:          []ss.Attributes{},
+			UUID:       uuid.New(),
+			ServerUUID: uuid.New(),
+			Name:       "BIOS",
+			Vendor:     "Dell",
+			Model:      "Version X",
+			Serial:     "DEF789",
+			Attributes: []ss.Attributes{
+				{
+					Namespace: "sh.hollow.alloy.inband.metadata",
+					Data:      json.RawMessage(`{"ID": "my-id"}`),
+				},
+			},
 			VersionedAttributes: []ss.VersionedAttributes{},
 			ComponentTypeName:   "BIOS",
 			ComponentTypeSlug:   "bios",
@@ -149,6 +154,8 @@ func TestRecordToComponent(t *testing.T) {
 		require.Equal(t, record.Model, got.Model)
 		require.Equal(t, record.Serial, got.Serial)
 		require.Equal(t, record.UpdatedAt, got.UpdatedAt)
+		require.NotNil(t, got.Attributes)
+		require.Equal(t, "my-id", got.Attributes.ID)
 	})
 	t.Run("out-of-band populates empty fields", func(t *testing.T) {
 		t.Parallel()
