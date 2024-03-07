@@ -157,7 +157,7 @@ func TestRecordToComponent(t *testing.T) {
 		require.NotNil(t, got.Attributes)
 		require.Equal(t, "my-id", got.Attributes.ID)
 	})
-	t.Run("out-of-band populates empty fields", func(t *testing.T) {
+	t.Run("populate empty fields", func(t *testing.T) {
 		t.Parallel()
 		record := &ss.ServerComponent{
 			UUID:       uuid.New(),
@@ -169,7 +169,7 @@ func TestRecordToComponent(t *testing.T) {
 			Attributes: []ss.Attributes{},
 			VersionedAttributes: []ss.VersionedAttributes{
 				{
-					Namespace: FirmwareVersionOutofbandNS,
+					Namespace: FirmwareVersionInbandNS,
 					Data:      json.RawMessage(`{"firmware": {"installed": "1.2.3"}}`),
 				},
 				{
@@ -189,7 +189,7 @@ func TestRecordToComponent(t *testing.T) {
 		require.Equal(t, "1.2.3", got.Firmware.Installed)
 		require.Equal(t, "ok", got.Status.State)
 	})
-	t.Run("in-band trumps out-of-band", func(t *testing.T) {
+	t.Run("specific overrides", func(t *testing.T) {
 		t.Parallel()
 		record := &ss.ServerComponent{
 			UUID:       uuid.New(),
@@ -226,8 +226,8 @@ func TestRecordToComponent(t *testing.T) {
 
 		got, err := RecordToComponent(record)
 		require.NoError(t, err)
-		require.Equal(t, "1.2.3-45", got.Firmware.Installed)
-		require.Equal(t, "ok, but could be better", got.Status.State)
+		require.Equal(t, "1.2.3", got.Firmware.Installed, "firmware version does not favor out-of-band")
+		require.Equal(t, "ok, but could be better", got.Status.State, "status does not favor in-band")
 	})
 	t.Run("malformed variable attribute returns an error", func(t *testing.T) {
 		t.Parallel()

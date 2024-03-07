@@ -34,9 +34,13 @@ func UnpackAttribute(attr *ss.Attributes, dst any) error {
 
 // RecordToComponent takes a single incoming FleetDB component record and creates
 // a rivets Component from it. An important difference from ConvertComponents (cf.
-// below) is that this sets a given attribute/variable attribute preferentially
-// from in-band data, using out-of-band only when there is no in-band inventory.
-// We find that in-band inventory data is more complete, especially for SuperMicro.
+// below) is that this sets a given attribute/versioned-attribute preferentially
+// based on some domain-specific factors. For most things, we prefer in-band data,
+// as we find that it is more complete, depending on the vendor. Dell is generally
+// equivalent information, but SMC is far more detailed in-band. The exception is
+// firmware versions, where Dell and SMC provide equivalent information in-band
+// vs. not, and biasing in-band inventory would actually hide updates from firmware
+// installs because the new versions are discovered via the BMC.
 //
 //nolint:gocyclo,gocritic
 func RecordToComponent(rec *ss.ServerComponent) (*rt.Component, error) {
@@ -55,12 +59,6 @@ func RecordToComponent(rec *ss.ServerComponent) (*rt.Component, error) {
 		// versioned attributes from FleetDB.
 		switch va.Namespace {
 		case FirmwareVersionInbandNS:
-			fwva := &FirmwareVersionedAttribute{}
-			if err := UnpackVersionedAttribute(&va, fwva); err != nil {
-				return nil, err
-			}
-			component.Firmware = fwva.Firmware
-		case FirmwareVersionOutofbandNS:
 			if component.Firmware == nil {
 				fwva := &FirmwareVersionedAttribute{}
 				if err := UnpackVersionedAttribute(&va, fwva); err != nil {
@@ -68,6 +66,12 @@ func RecordToComponent(rec *ss.ServerComponent) (*rt.Component, error) {
 				}
 				component.Firmware = fwva.Firmware
 			}
+		case FirmwareVersionOutofbandNS:
+			fwva := &FirmwareVersionedAttribute{}
+			if err := UnpackVersionedAttribute(&va, fwva); err != nil {
+				return nil, err
+			}
+			component.Firmware = fwva.Firmware
 		case StatusInbandNS:
 			st := &StatusVersionedAttribute{}
 			if err := UnpackVersionedAttribute(&va, st); err != nil {
