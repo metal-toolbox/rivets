@@ -47,11 +47,11 @@ func init() {
 // spanEvent adds a span event along with the given attributes.
 //
 // event here is arbitrary and can be in the form of strings like - publishCondition, updateCondition etc
-func spanEvent(span trace.Span, condition *condition.Condition, controllerID, event string) {
+func spanEvent(span trace.Span, cond *condition.Condition, controllerID, event string) {
 	span.AddEvent(event, trace.WithAttributes(
 		attribute.String("controllerID", controllerID),
-		attribute.String("conditionID", condition.ID.String()),
-		attribute.String("conditionKind", string(condition.Kind)),
+		attribute.String("conditionID", cond.ID.String()),
+		attribute.String("conditionKind", string(cond.Kind)),
 	))
 }
 

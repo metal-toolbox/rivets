@@ -11,6 +11,7 @@ import (
 	"github.com/nats-io/nats-server/v2/server"
 	srvtest "github.com/nats-io/nats-server/v2/test"
 	"github.com/nats-io/nats.go"
+	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
 
@@ -103,7 +104,7 @@ func TestPublish(t *testing.T) {
 	err = json.Unmarshal(entry.Value(), sv)
 	require.NoError(t, err, "unmarshal")
 
-	require.Equal(t, cond.Version, sv.MsgVersion, "version check")
+	require.Equal(t, condition.StatusValueVersion, sv.MsgVersion, "version check")
 	require.Equal(t, serverID.String(), sv.Target, "sv Target")
 	require.Contains(t, string(sv.Status), condition.Pending, "sv Status")
 
@@ -142,6 +143,7 @@ func TestConditionState(t *testing.T) {
 	}{
 		{
 			name: "Condition not started",
+			// nolint:revive // function param names I'd like to keep around, k thx revive
 			setup: func(conditionID string, kv nats.KeyValue) {
 				// No setup needed as no KV entry will exist
 			},
@@ -154,14 +156,18 @@ func TestConditionState(t *testing.T) {
 					// Populate other required fields
 				}
 				data, _ := json.Marshal(statusValue)
-				kv.Put("testFacility."+conditionID, data)
+				if _, err := kv.Put("testFacility."+conditionID, data); err != nil {
+					t.Fatal(err)
+				}
 			},
 		},
 		{
 			name: "Condition indeterminate (unreadable status)",
 			setup: func(conditionID string, kv nats.KeyValue) {
 				// Put unreadable data
-				kv.Put("testFacility."+conditionID, []byte("not json"))
+				if _, err := kv.Put("testFacility."+conditionID, []byte("not json")); err != nil {
+					t.Fatal(err)
+				}
 			},
 		},
 		{
@@ -173,7 +179,9 @@ func TestConditionState(t *testing.T) {
 					// Populate other required fields
 				}
 				data, _ := json.Marshal(statusValue)
-				kv.Put("testFacility."+conditionID, data)
+				if _, err := kv.Put("testFacility."+conditionID, data); err != nil {
+					t.Fatal(err)
+				}
 			},
 		},
 	}
@@ -184,7 +192,7 @@ func TestConditionState(t *testing.T) {
 			tt.setup(tt.conditionID, kvStore)
 
 			entry, err := kvStore.Get("testFacility." + tt.conditionID)
-			if err == nats.ErrKeyNotFound && tt.name == "Condition not started" {
+			if errors.Is(err, nats.ErrKeyNotFound) && tt.name == "Condition not started" {
 				// Expected path for not started condition
 				return
 			}

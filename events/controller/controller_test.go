@@ -99,7 +99,7 @@ func TestProcessCondition(t *testing.T) {
 	tests := []struct {
 		name         string
 		conditionID  uuid.UUID
-		state        conditionState
+		state        ConditionState
 		expectMethod string
 		handlerErr   error
 	}{
@@ -156,7 +156,7 @@ func TestProcessCondition(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			condition := &condition.Condition{ID: tt.conditionID}
+			cond := &condition.Condition{ID: tt.conditionID}
 
 			cStatusQueryor := NewMockConditionStatusQueryor(t)
 			// expect method to be invoked for each condition status query
@@ -190,7 +190,7 @@ func TestProcessCondition(t *testing.T) {
 				conditionHandlerFactory: func() ConditionHandler { return handler },
 			}
 
-			n.processCondition(context.Background(), condition, eStatusAcknowledger, cStatusQueryor, nil)
+			n.processCondition(context.Background(), cond, eStatusAcknowledger, cStatusQueryor, nil)
 
 			eStatusAcknowledger.AssertCalled(t, tt.expectMethod)
 			cStatusQueryor.AssertExpectations(t)
@@ -272,16 +272,16 @@ func TestRunConditionHandlerWithMonitor(t *testing.T) {
 
 	// test monitor calls ackInprogress
 	ctx := context.Background()
-	condition := &condition.Condition{Kind: condition.FirmwareInstall}
+	cond := &condition.Condition{Kind: condition.FirmwareInstall}
 	publisher := NewMockConditionStatusPublisher(t)
 
 	message := events.NewMockMessage(t)
 	message.On("InProgress").Return(nil)
 
 	handler := NewMockConditionHandler(t)
-	handler.On("Handle", mock.Anything, condition, publisher).Times(1).
+	handler.On("Handle", mock.Anything, cond, publisher).Times(1).
 		//  sleep for 100ms
-		Run(func(args mock.Arguments) { time.Sleep(100 * time.Millisecond) }).
+		Run(func(_ mock.Arguments) { time.Sleep(100 * time.Millisecond) }).
 		Return(nil)
 
 	n := &NatsController{
@@ -293,7 +293,7 @@ func TestRunConditionHandlerWithMonitor(t *testing.T) {
 
 	gotErr := n.runConditionHandlerWithMonitor(
 		ctx,
-		condition,
+		cond,
 		n.newNatsEventStatusAcknowleger(message),
 		publisher,
 		10*time.Millisecond, // ack every 10ms
