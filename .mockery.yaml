@@ -1,0 +1,22 @@
+testonly: False
+with-expecter: True
+packages:
+  github.com/metal-toolbox/rivets/events/controller:
+    config:
+      dir: events/controller
+      fileName: "mock_{{.InterfaceName | firstLower}}.go"
+      inpackage: True
+    interfaces:
+      ConditionHandler:
+      StatusPublisher:
+      ConditionStatusQueryor:
+      ConditionStatusPublisher:
+      eventStatusAcknowleger:
+  github.com/metal-toolbox/rivets/events:
+    config:
+      dir: events/
+      fileName: "mock_{{.InterfaceName | firstLower}}.go"
+      inpackage: True
+    interfaces:
+      Message:
+      Stream:

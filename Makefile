@@ -8,6 +8,12 @@ lint:
 test: lint
 	CGO_ENABLED=0 go test -timeout 1m -v -covermode=atomic ./...
 
+## Generate mocks
+gen-mock:
+	go install github.com/vektra/mockery/v2@v2.42.1
+	mockery
+	go mod tidy
+
 # https://gist.github.com/prwhite/8168133
 # COLORS
 GREEN  := $(shell tput -Txterm setaf 2)
