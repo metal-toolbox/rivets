@@ -63,7 +63,6 @@ linters:
     - goerr113
     - goimports
     - revive
-    - gomnd
     - misspell
     - noctx
     - stylecheck
@@ -85,6 +84,7 @@ issues:
     - linters:
         - stylecheck
       text: "ST1016"
+
   exclude:
     # Default excludes from `golangci-lint run --help` with EXC0002 removed
     # EXC0001 errcheck: Almost all programs ignore errors on these functions and in most cases it's ok

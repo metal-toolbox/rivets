@@ -18,18 +18,18 @@ func (_m *MockConditionStatusQueryor) EXPECT() *MockConditionStatusQueryor_Expec
 }
 
 // ConditionState provides a mock function with given fields: conditionID
-func (_m *MockConditionStatusQueryor) ConditionState(conditionID string) conditionState {
+func (_m *MockConditionStatusQueryor) ConditionState(conditionID string) ConditionState {
 	ret := _m.Called(conditionID)
 
 	if len(ret) == 0 {
 		panic("no return value specified for ConditionState")
 	}
 
-	var r0 conditionState
-	if rf, ok := ret.Get(0).(func(string) conditionState); ok {
+	var r0 ConditionState
+	if rf, ok := ret.Get(0).(func(string) ConditionState); ok {
 		r0 = rf(conditionID)
 	} else {
-		r0 = ret.Get(0).(conditionState)
+		r0 = ret.Get(0).(ConditionState)
 	}
 
 	return r0
@@ -53,12 +53,12 @@ func (_c *MockConditionStatusQueryor_ConditionState_Call) Run(run func(condition
 	return _c
 }
 
-func (_c *MockConditionStatusQueryor_ConditionState_Call) Return(_a0 conditionState) *MockConditionStatusQueryor_ConditionState_Call {
+func (_c *MockConditionStatusQueryor_ConditionState_Call) Return(_a0 ConditionState) *MockConditionStatusQueryor_ConditionState_Call {
 	_c.Call.Return(_a0)
 	return _c
 }
 
-func (_c *MockConditionStatusQueryor_ConditionState_Call) RunAndReturn(run func(string) conditionState) *MockConditionStatusQueryor_ConditionState_Call {
+func (_c *MockConditionStatusQueryor_ConditionState_Call) RunAndReturn(run func(string) ConditionState) *MockConditionStatusQueryor_ConditionState_Call {
 	_c.Call.Return(run)
 	return _c
 }

@@ -21,7 +21,7 @@ import (
 const (
 	pkgName = "events/natscontroller"
 	// Default connection timeout
-	connectionTimeout = 60 * time.Second
+	connectionTimeout = 1 * time.Minute
 	// Default timeout for the condition handler, after which its canceled
 	handlerTimeout = 180 * time.Minute
 	// Default pull event interval
@@ -301,7 +301,7 @@ func (n *NatsController) processConditionFromEvent(ctx context.Context, msg even
 	atomic.AddInt32(&n.dispatched, 1)
 	defer atomic.AddInt32(&n.dispatched, -1)
 
-	condition, err := conditionFromEvent(msg)
+	cond, err := conditionFromEvent(msg)
 	if err != nil {
 		n.logger.WithError(err).WithField(
 			"subject", msg.Subject()).Warn("unable to retrieve condition from message")
@@ -315,15 +315,15 @@ func (n *NatsController) processConditionFromEvent(ctx context.Context, msg even
 	// extract parent trace context from the event if any.
 	ctx = msg.ExtractOtelTraceContext(ctx)
 
-	conditionStatusPublisher, err := n.NewNatsConditionStatusPublisher(condition.ID.String())
+	conditionStatusPublisher, err := n.NewNatsConditionStatusPublisher(cond.ID.String())
 	if err != nil {
-		n.logger.WithField("conditionID", condition.ID.String()).Warn("failed to initialize publisher")
+		n.logger.WithField("conditionID", cond.ID.String()).Warn("failed to initialize publisher")
 		eventAcknowleger.nak()
-		spanEvent(span, condition, n.controllerID.String(), "sent nack, failed to initialize publisher: "+err.Error())
+		spanEvent(span, cond, n.controllerID.String(), "sent nack, failed to initialize publisher: "+err.Error())
 		return
 	}
 
-	n.processCondition(ctx, condition, eventAcknowleger, conditionStatusQueryor, conditionStatusPublisher)
+	n.processCondition(ctx, cond, eventAcknowleger, conditionStatusQueryor, conditionStatusPublisher)
 }
 
 func conditionFromEvent(e events.Message) (*condition.Condition, error) {
@@ -333,12 +333,12 @@ func conditionFromEvent(e events.Message) (*condition.Condition, error) {
 	}
 
 	errConditionDeserialize := errors.New("unable to deserialize condition")
-	condition := &condition.Condition{}
-	if err := json.Unmarshal(data, condition); err != nil {
+	cond := &condition.Condition{}
+	if err := json.Unmarshal(data, cond); err != nil {
 		return nil, errors.Wrap(errConditionDeserialize, err.Error())
 	}
 
-	return condition, nil
+	return cond, nil
 }
 
 // process condition

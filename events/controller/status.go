@@ -124,11 +124,11 @@ func (s *NatsConditionStatusPublisher) Publish(ctx context.Context, serverID str
 	}).Trace("published task status")
 }
 
-// conditionState represents the various states a condition can be in during its lifecycle.
-type conditionState int
+// ConditionState represents the various states a condition can be in during its lifecycle.
+type ConditionState int
 
 const (
-	notStarted    conditionState = iota
+	notStarted    ConditionState = iota
 	inProgress                   // another controller has started it, is still around and updated recently
 	complete                     // condition is done
 	orphaned                     // the controller that started this task doesn't exist anymore
@@ -138,7 +138,7 @@ const (
 // ConditionStatusQueryor defines an interface for querying the status of a condition.
 type ConditionStatusQueryor interface {
 	// ConditionState returns the current state of a condition based on its ID.
-	ConditionState(conditionID string) conditionState
+	ConditionState(conditionID string) ConditionState
 }
 
 // NatsConditionStatusQueryor implements ConditionStatusQueryor to query condition states using NATS.
@@ -167,7 +167,7 @@ func (n *NatsController) NewNatsConditionStatusQueryor() (*NatsConditionStatusQu
 }
 
 // ConditionState queries the NATS KeyValue store to determine the current state of a condition.
-func (p *NatsConditionStatusQueryor) ConditionState(conditionID string) conditionState {
+func (p *NatsConditionStatusQueryor) ConditionState(conditionID string) ConditionState {
 	lookupKey := fmt.Sprintf("%s.%s", p.facilityCode, conditionID)
 	entry, err := p.kv.Get(lookupKey)
 	switch err {
