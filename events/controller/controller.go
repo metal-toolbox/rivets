@@ -327,12 +327,12 @@ func (n *NatsController) processConditionFromEvent(ctx context.Context, msg even
 }
 
 func conditionFromEvent(e events.Message) (*condition.Condition, error) {
+	errConditionDeserialize := errors.New("unable to deserialize condition")
 	data := e.Data()
 	if data == nil {
-		return nil, errors.New("data field empty")
+		return nil, errors.Wrap(errConditionDeserialize, "data field empty")
 	}
 
-	errConditionDeserialize := errors.New("unable to deserialize condition")
 	cond := &condition.Condition{}
 	if err := json.Unmarshal(data, cond); err != nil {
 		return nil, errors.Wrap(errConditionDeserialize, err.Error())
