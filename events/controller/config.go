@@ -44,5 +44,6 @@ func queueConfig(appName, facilityCode, subjectSuffix, natsURL, credsFile string
 			FilterSubject:     consumerSubject,
 			SubscribeSubjects: []string{consumerSubject},
 		},
+		KVReplicationFactor: 3,
 	}
 }

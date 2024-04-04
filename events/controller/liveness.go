@@ -22,11 +22,7 @@ var (
 func (n *NatsController) checkinKVOpts() []kv.Option {
 	opts := []kv.Option{
 		kv.WithTTL(checkinLivenessTTL),
-	}
-
-	// any setting of replicas (even 1) chokes NATS in non-clustered mode
-	if n.kvReplicas != 1 {
-		opts = append(opts, kv.WithReplicas(n.kvReplicas))
+		kv.WithReplicas(n.natsConfig.KVReplicationFactor),
 	}
 
 	return opts
