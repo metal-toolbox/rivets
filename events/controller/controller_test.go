@@ -41,9 +41,9 @@ func TestNewNatsControllerWithOptions(t *testing.T) {
 		},
 		{
 			name:   "WithKVReplicas",
-			option: WithKVReplicas(3),
+			option: WithKVReplicas(0),
 			validate: func(t *testing.T, nc *NatsController) {
-				assert.Equal(t, 3, nc.kvReplicas, "kvReplicas should match the expected value")
+				assert.Equal(t, 0, nc.natsConfig.KVReplicationFactor, "kvReplicas should match the expected value")
 			},
 		},
 		{
@@ -93,6 +93,7 @@ func TestNatsControllerDefaultParameters(t *testing.T) {
 	assert.Equal(t, pullEventInterval, c.pullEventInterval, "pullEventInterval should match the expected default value")
 	assert.Equal(t, pullEventTimeout, c.pullEventTimeout, "pullEventTimeout should match the expected default value")
 	assert.Equal(t, concurrency, c.concurrency, "concurrency should match the expected default value")
+	assert.Equal(t, kvReplicationFactor, c.natsConfig.KVReplicationFactor, "kv replicas should match the expected default value")
 }
 
 func TestProcessCondition(t *testing.T) {

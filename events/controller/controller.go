@@ -34,6 +34,8 @@ const (
 	ackInProgressInterval = 1 * time.Second
 	// controller check in interval
 	checkinInterval = 30 * time.Second
+	// default number of KV replicas for created NATS buckets
+	kvReplicationFactor = 3
 )
 
 var (
@@ -50,7 +52,6 @@ type NatsController struct {
 	hostname          string
 	facilityCode      string
 	conditionKind     condition.Kind
-	kvReplicas        int
 	pullEventInterval time.Duration
 	pullEventTimeout  time.Duration
 	handlerTimeout    time.Duration
@@ -115,9 +116,12 @@ func WithConcurrency(c int) Option {
 	}
 }
 
+// Set the number of replicates to keep for the
+//
+// !! In a non-clustered NATS environment, set this value to 0.
 func WithKVReplicas(c int) Option {
 	return func(n *NatsController) {
-		n.kvReplicas = c
+		n.natsConfig.KVReplicationFactor = c
 	}
 }
 
@@ -172,7 +176,7 @@ func (n *NatsController) Connect(ctx context.Context) error {
 	n.logger.WithFields(
 		logrus.Fields{
 			"ID":            n.controllerID,
-			"replica-count": n.kvReplicas,
+			"replica-count": n.natsConfig.KVReplicationFactor,
 			"concurrency":   n.concurrency,
 		},
 	).Info("connected to event stream as controller")
