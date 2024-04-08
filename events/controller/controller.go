@@ -153,6 +153,8 @@ func (n *NatsController) Connect(ctx context.Context) error {
 	)
 	defer span.End()
 
+	startTS := time.Now()
+
 	errInit := errors.New("nats broker init error")
 	stream, err := events.NewNatsBroker(n.natsConfig)
 	if err != nil {
@@ -175,9 +177,11 @@ func (n *NatsController) Connect(ctx context.Context) error {
 	n.startLivenessCheckin(ctx)
 	n.logger.WithFields(
 		logrus.Fields{
-			"ID":            n.controllerID,
+			"hostname":      n.hostname,
+			"facility":      n.facilityCode,
 			"replica-count": n.natsConfig.KVReplicationFactor,
 			"concurrency":   n.concurrency,
+			"connect-time":  time.Since(startTS).String(),
 		},
 	).Info("connected to event stream as controller")
 
