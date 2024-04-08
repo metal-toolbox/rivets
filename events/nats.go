@@ -218,31 +218,34 @@ func (n *NatsJetstream) addConsumer() error {
 		FilterSubject: n.parameters.Consumer.FilterSubject,
 	}
 
+	addConsumerFunc := func(streamName string, cfg *nats.ConsumerConfig) error {
+		if _, err := n.jsctx.AddConsumer(streamName, cfg); err != nil {
+			return errors.Wrap(err, ErrNatsJetstreamAddConsumer.Error())
+		}
+
+		return nil
+	}
+
 	// Update consumer configuration when one exists
-	for name := range n.jsctx.ConsumerNames(n.parameters.Stream.Name) {
-		consumerInfo, err := n.jsctx.ConsumerInfo(n.parameters.Stream.Name, n.parameters.Consumer.Name)
-		if err != nil {
-			if errors.Is(err, nats.ErrConsumerNotFound) {
-				break
-			}
-
-			return errors.Wrap(err, ErrNatsJetstreamAddConsumer.Error()+" consumer.Name="+n.parameters.Consumer.Name)
+	consumerInfo, err := n.jsctx.ConsumerInfo(n.parameters.Stream.Name, n.parameters.Consumer.Name)
+	if err != nil {
+		if errors.Is(err, nats.ErrConsumerNotFound) {
+			return addConsumerFunc(n.parameters.Stream.Name, cfg)
 		}
 
-		if name == n.parameters.Consumer.Name && !n.consumerConfigIsEqual(consumerInfo) {
-			if _, err := n.jsctx.UpdateConsumer(n.parameters.Stream.Name, cfg); err != nil {
-				return errors.Wrap(err, ErrNatsJetstreamUpdateConsumer.Error())
-			}
+		return errors.Wrap(err, ErrNatsJetstreamAddConsumer.Error()+" consumer.Name="+n.parameters.Consumer.Name)
+	}
 
-			return nil
+	if !n.consumerConfigIsEqual(consumerInfo) {
+		if _, err := n.jsctx.UpdateConsumer(n.parameters.Stream.Name, cfg); err != nil {
+
+			return errors.Wrap(err, ErrNatsJetstreamUpdateConsumer.Error())
 		}
+
+		return nil
 	}
 
-	if _, err := n.jsctx.AddConsumer(n.parameters.Stream.Name, cfg); err != nil {
-		return errors.Wrap(err, ErrNatsJetstreamAddConsumer.Error())
-	}
-
-	return nil
+	return addConsumerFunc(n.parameters.Stream.Name, cfg)
 }
 
 func (n *NatsJetstream) consumerConfigIsEqual(consumerInfo *nats.ConsumerInfo) bool {
