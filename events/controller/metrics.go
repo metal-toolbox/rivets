@@ -15,6 +15,7 @@ var (
 	metricsNATSErrors              *prometheus.CounterVec
 	metricsEventCounter            *prometheus.CounterVec
 	metricsConditionRunTimeSummary *prometheus.SummaryVec
+	metricsNATSConnectTime         *prometheus.SummaryVec
 )
 
 func init() {
@@ -42,6 +43,13 @@ func init() {
 		[]string{"condition", "state"},
 	)
 
+	metricsNATSConnectTime = promauto.NewSummaryVec(
+		prometheus.SummaryOpts{
+			Name: "nats_connection_time",
+			Help: "A summary metric to measure the time taken to connect and subscribe to the NATS Jetstream",
+		},
+		[]string{},
+	)
 }
 
 // spanEvent adds a span event along with the given attributes.
@@ -57,6 +65,10 @@ func spanEvent(span trace.Span, cond *condition.Condition, controllerID, event s
 
 func metricsNATSError(op string) {
 	metricsNATSErrors.WithLabelValues(op).Inc()
+}
+
+func registerNATSConnectTimeMetric(startTS time.Time) {
+	metricsNATSConnectTime.With(prometheus.Labels{}).Observe(time.Since(startTS).Seconds())
 }
 
 func metricsEventsCounter(valid bool, response string) {
