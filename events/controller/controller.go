@@ -184,6 +184,7 @@ func (n *NatsController) Connect(ctx context.Context) error {
 			"connect-time":  time.Since(startTS).String(),
 		},
 	).Info("connected to event stream as controller")
+	registerNATSConnectTimeMetric(startTS)
 
 	return nil
 }
