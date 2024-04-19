@@ -186,7 +186,7 @@ func ConvertServer(s *ss.Server) *rt.Server {
 				server.BMCAddress = bmcAttr.Address
 			}
 
-		case ServerAttributeNSVendor:
+		case ServerVendorAttributeNS:
 			svmAttr := ServerVendorAttribute{}
 			if err := UnpackAttribute(&attr, &svmAttr); err == nil {
 				server.Vendor = svmAttr.Vendor
