@@ -1,43 +1,43 @@
 package fleetdb
 
 const (
-	// Serverservice attribute namespace for device vendor, model, serial attributes.
-	ServerAttributeNSVendor = "sh.hollow.alloy.server_vendor_attributes"
+	// FleetDB attribute namespace for device vendor, model, serial attributes.
+	ServerVendorAttributeNS = "sh.hollow.alloy.server_vendor_attributes"
 
-	// Serverservice attribute namespace for the BMC address.
+	// FleetDB attribute namespace for the BMC address.
 	ServerAttributeNSBmcAddress = "sh.hollow.bmc_info"
 
-	// Serverservice attribute namespace for firmware set labels.
-	FirmwareAttributeNSFirmwareSetLabels = "sh.hollow.firmware_set.labels"
+	// FleetDB attribute namespace for firmware set labels.
+	FirmwareSetAttributeNS = "sh.hollow.firmware_set.labels"
 
-	// Serverservice attribute namespace for inband firmware information.
+	// FleetDB attribute namespace for inband firmware information.
 	FirmwareVersionInbandNS = "sh.hollow.alloy.inband.firmware"
 
-	// Serverservice attribute namespace for outofband firmware information.
+	// FleetDB attribute namespace for outofband firmware information.
 	FirmwareVersionOutofbandNS = "sh.hollow.alloy.outofband.firmware"
 
-	// Serverservice attribute namespace for outofband bios configuration.
+	// FleetDB attribute namespace for outofband bios configuration.
 	BiosConfigOutofbandNS = "sh.hollow.alloy.outofband.bios_configuration"
 
-	// Serverservice attribute namespace for inband bios configuration.
+	// FleetDB attribute namespace for inband bios configuration.
 	BiosConfigInbandNS = "sh.hollow.alloy.inband.bios_configuration"
 
-	// Serverservice attribute namespace for inband component attributes/metadata.
+	// FleetDB attribute namespace for inband component attributes/metadata.
 	ComponentAttributeInbandNS = "sh.hollow.alloy.inband.metadata"
 
-	// Serverservice attribute namespace for outofband component attributes/metadata.
+	// FleetDB attribute namespace for outofband component attributes/metadata.
 	ComponentAttributeOutofbandNS = "sh.hollow.alloy.outofband.metadata"
 
-	// Serverservice attribute for installed firmware.
+	// FleetDB attribute for installed firmware.
 	FirmwareVersionNSInstalledAttribute = "firmware.installed"
 
-	// Serverservice attribute namespace for inband component status information.
+	// FleetDB attribute namespace for inband component status information.
 	StatusInbandNS = "sh.hollow.alloy.inband.status"
 
-	// Serverservice attribute namespace for outofband component status information.
+	// FleetDB attribute namespace for outofband component status information.
 	StatusOutofbandNS = "sh.hollow.alloy.outofband.status"
 
-	// Serverservice attribute for component health status.
+	// FleetDB attribute for component health status.
 	StatusNSHealthAttribute = "status.health"
 
 	// Serserverservice attribute for errors that occurred when connecting/collecting inventory from the bmc are stored here.
