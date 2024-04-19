@@ -289,7 +289,7 @@ func (n *NatsController) processEvents(ctx context.Context) error {
 		if err != nil {
 			eventAcknowleger.nak()
 
-			return errors.Wrap(errProcessEvent, ctx.Err().Error())
+			return errors.Wrap(errProcessEvent, err.Error())
 		}
 
 		// spawn msg process handler
