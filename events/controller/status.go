@@ -21,12 +21,17 @@ import (
 )
 
 var (
-	kvTTL = 10 * 24 * time.Hour
+	kvTTL             = 10 * 24 * time.Hour
+	errGetKey         = errors.New("error fetching existing key, value for update")
+	errUnmarshalKey   = errors.New("error unmarshal key, value for update")
+	errWorkerMismatch = errors.New("condition worker mismatch error")
+	errStatusValue    = errors.New("condition status value error")
 )
 
 // ConditionStatusPublisher defines an interface for publishing status updates for conditions.
 type ConditionStatusPublisher interface {
 	Publish(ctx context.Context, serverID string, state condition.State, status json.RawMessage)
+	UpdateTimestamp(ctx context.Context)
 }
 
 // NatsConditionStatusPublisher implements the StatusPublisher interface to publish condition status updates using NATS.
