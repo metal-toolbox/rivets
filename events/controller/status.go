@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"reflect"
 	"time"
 
 	"github.com/nats-io/nats.go"
@@ -63,6 +64,49 @@ func (n *NatsController) NewNatsConditionStatusPublisher(conditionID string) (*N
 	}, nil
 }
 
+func key(facilityCode, conditionID string) string {
+	return fmt.Sprintf("%s.%s", facilityCode, conditionID)
+}
+
+func (s *NatsConditionStatusPublisher) UpdateTimestamp(ctx context.Context) {
+	key := key(s.facilityCode, s.conditionID)
+	_, span := otel.Tracer(pkgName).Start(
+		ctx,
+		"controller.Publish.updateConditionTS",
+		trace.WithSpanKind(trace.SpanKindConsumer),
+	)
+	defer span.End()
+
+	rev, err := s.update(key, nil, true)
+	if err != nil {
+		metricsNATSError("update-condition-ts")
+		span.AddEvent("condition TS update failure",
+			trace.WithAttributes(
+				attribute.String("controllerID", s.controllerID),
+				attribute.String("conditionID", s.conditionID),
+				attribute.String("error", err.Error()),
+			),
+		)
+
+		s.log.WithError(err).WithFields(logrus.Fields{
+			"assetFacilityCode": s.facilityCode,
+			"conditionID":       s.conditionID,
+			"lastRev":           s.lastRev,
+			"controllerID":      s.controllerID,
+			"key":               key,
+		}).Warn("unable to update condition TS")
+		return
+	}
+
+	s.log.WithFields(logrus.Fields{
+		"assetFacilityCode": s.facilityCode,
+		"taskID":            s.conditionID,
+		"lastRev":           s.lastRev,
+		"key":               key,
+	}).Trace("condition TS updated")
+	s.lastRev = rev
+}
+
 // Publish implements the StatusPublisher interface. It serializes and publishes the current status of a condition to NATS.
 func (s *NatsConditionStatusPublisher) Publish(ctx context.Context, serverID string, state condition.State, status json.RawMessage) {
 	_, span := otel.Tracer(pkgName).Start(
@@ -72,7 +116,6 @@ func (s *NatsConditionStatusPublisher) Publish(ctx context.Context, serverID str
 	)
 	defer span.End()
 
-	key := fmt.Sprintf("%s.%s", s.facilityCode, s.conditionID)
 	sv := &condition.StatusValue{
 		WorkerID:  s.controllerID,
 		Target:    serverID,
@@ -83,14 +126,14 @@ func (s *NatsConditionStatusPublisher) Publish(ctx context.Context, serverID str
 		UpdatedAt: time.Now(),
 	}
 
-	payload := sv.MustBytes()
+	key := key(s.facilityCode, s.conditionID)
 
 	var err error
 	var rev uint64
 	if s.lastRev == 0 {
-		rev, err = s.kv.Create(key, payload)
+		rev, err = s.kv.Create(key, sv.MustBytes())
 	} else {
-		rev, err = s.kv.Update(key, payload, s.lastRev)
+		rev, err = s.update(key, sv, false)
 	}
 
 	if err != nil {
@@ -109,6 +152,7 @@ func (s *NatsConditionStatusPublisher) Publish(ctx context.Context, serverID str
 			"assetFacilityCode": s.facilityCode,
 			"conditionID":       s.conditionID,
 			"lastRev":           s.lastRev,
+			"controllerID":      s.controllerID,
 			"key":               key,
 		}).Warn("unable to write task status")
 		return
@@ -122,6 +166,102 @@ func (s *NatsConditionStatusPublisher) Publish(ctx context.Context, serverID str
 		"lastRev":           s.lastRev,
 		"key":               key,
 	}).Trace("published task status")
+}
+
+func (s *NatsConditionStatusPublisher) update(key string, newStatusValue *condition.StatusValue, onlyTimestamp bool) (uint64, error) {
+	// fetch current status value from KV
+	entry, err := s.kv.Get(key)
+	if err != nil {
+		return 0, errors.Wrap(errGetKey, err.Error())
+	}
+
+	curStatusValue := &condition.StatusValue{}
+	if errJSON := json.Unmarshal(entry.Value(), &curStatusValue); errJSON != nil {
+		return 0, errors.Wrap(errUnmarshalKey, errJSON.Error())
+	}
+
+	if curStatusValue.WorkerID != s.controllerID {
+		return 0, errors.Wrap(errWorkerMismatch, curStatusValue.WorkerID)
+	}
+
+	var update *condition.StatusValue
+	if onlyTimestamp {
+		// timestamp only update
+		curStatusValue.UpdatedAt = time.Now()
+		update = curStatusValue
+	} else {
+		// full status update
+		update, err = statusValueUpdate(curStatusValue, newStatusValue)
+		if err != nil {
+			return 0, err
+		}
+	}
+
+	rev, err := s.kv.Update(key, update.MustBytes(), s.lastRev)
+	if err != nil {
+		return 0, err
+	}
+
+	return rev, nil
+}
+
+func statusValueUpdate(curSV, newSV *condition.StatusValue) (updateSV *condition.StatusValue, err error) {
+	// condition is already in a completed state, no further updates to be published
+	if condition.StateIsComplete(condition.State(curSV.State)) {
+		return nil, errors.Wrap(
+			errStatusValue,
+			"invalid update, condition state already finalized: "+
+				string(curSV.State),
+		)
+	}
+
+	// The update to be published
+	updateSV = &condition.StatusValue{
+		WorkerID:  curSV.WorkerID,
+		Target:    curSV.Target,
+		TraceID:   curSV.TraceID,
+		SpanID:    curSV.SpanID,
+		UpdatedAt: time.Now(),
+	}
+
+	// update State
+	if newSV.State != "" {
+		updateSV.State = newSV.State
+	} else {
+		updateSV.State = curSV.State
+	}
+
+	svEqual, err := svBytesEqual(curSV.Status, newSV.Status)
+	if err != nil {
+		return nil, errors.Wrap(errStatusValue, err.Error())
+	}
+
+	// update Status
+	//
+	// At minimum a valid Status JSON has 9 chars - `{"a": "b"}`
+	if newSV.Status != nil && !svEqual && len(newSV.Status) >= 9 {
+		updateSV.Status = newSV.Status
+	} else {
+		updateSV.Status = curSV.Status
+	}
+
+	return updateSV, nil
+}
+
+// svBytesEqual compares the JSON in the two json.RawMessage
+//
+// source: https://stackoverflow.com/questions/32408890/how-to-compare-two-json-requests
+func svBytesEqual(curSV, newSV json.RawMessage) (bool, error) {
+	var j, j2 interface{}
+	if err := json.Unmarshal(curSV, &j); err != nil {
+		return false, errors.Wrap(err, "current StatusValue unmarshal error")
+	}
+
+	if err := json.Unmarshal(newSV, &j2); err != nil {
+		return false, errors.Wrap(err, "new StatusValue unmarshal error")
+	}
+
+	return reflect.DeepEqual(j2, j), nil
 }
 
 // ConditionState represents the various states a condition can be in during its lifecycle.
@@ -168,8 +308,8 @@ func (n *NatsController) NewNatsConditionStatusQueryor() (*NatsConditionStatusQu
 
 // ConditionState queries the NATS KeyValue store to determine the current state of a condition.
 func (p *NatsConditionStatusQueryor) ConditionState(conditionID string) ConditionState {
-	lookupKey := fmt.Sprintf("%s.%s", p.facilityCode, conditionID)
-	entry, err := p.kv.Get(lookupKey)
+	key := key(p.facilityCode, conditionID)
+	entry, err := p.kv.Get(key)
 	switch err {
 	case nats.ErrKeyNotFound:
 		// This should be by far the most common path through this code.
@@ -179,7 +319,7 @@ func (p *NatsConditionStatusQueryor) ConditionState(conditionID string) Conditio
 	default:
 		p.logger.WithError(err).WithFields(logrus.Fields{
 			"conditionID": conditionID,
-			"lookupKey":   lookupKey,
+			"key":         key,
 		}).Warn("error reading condition status")
 
 		return indeterminate
@@ -190,7 +330,7 @@ func (p *NatsConditionStatusQueryor) ConditionState(conditionID string) Conditio
 	if errJSON := json.Unmarshal(entry.Value(), &sv); errJSON != nil {
 		p.logger.WithError(errJSON).WithFields(logrus.Fields{
 			"conditionID": conditionID,
-			"lookupKey":   lookupKey,
+			"lookupKey":   key,
 		}).Warn("unable to construct a sane status for this condition")
 
 		return indeterminate
@@ -201,7 +341,7 @@ func (p *NatsConditionStatusQueryor) ConditionState(conditionID string) Conditio
 		p.logger.WithFields(logrus.Fields{
 			"conditionID":    conditionID,
 			"conditionState": sv.State,
-			"lookupKey":      lookupKey,
+			"lookupKey":      key,
 		}).Info("this condition is already complete")
 
 		return complete
@@ -233,11 +373,11 @@ func (p *NatsConditionStatusQueryor) ConditionState(conditionID string) Conditio
 		// We're going to restart this condition when we return from
 		// this function. Use the KV handle we have to delete the
 		// existing task key.
-		if err = p.kv.Delete(lookupKey); err != nil {
+		if err = p.kv.Delete(key); err != nil {
 			p.logger.WithError(err).WithFields(logrus.Fields{
 				"conditionID":           conditionID,
 				"original controllerID": sv.WorkerID,
-				"lookupKey":             lookupKey,
+				"lookupKey":             key,
 			}).Warn("unable to delete existing condition status")
 
 			return indeterminate

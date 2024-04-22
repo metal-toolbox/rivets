@@ -13,6 +13,7 @@ import (
 	"github.com/nats-io/nats.go"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/metal-toolbox/rivets/condition"
@@ -205,6 +206,183 @@ func TestConditionState(t *testing.T) {
 				require.Error(t, err, "Expect error on unmarshal for indeterminate condition")
 			} else {
 				require.NoError(t, err, "Expect successful unmarshal for condition status")
+			}
+		})
+	}
+}
+
+func TestStatusValueUpdate(t *testing.T) {
+	tests := []struct {
+		name                string
+		curSV               *condition.StatusValue
+		newSV               *condition.StatusValue
+		expectedSV          *condition.StatusValue
+		expectedErrContains string
+	}{
+		{
+			name: "Successful status update with different states",
+			curSV: &condition.StatusValue{
+				WorkerID: "worker1",
+				Target:   "target1",
+				TraceID:  "trace1",
+				SpanID:   "span1",
+				State:    string(condition.Pending),
+				Status:   json.RawMessage(`{"msg":"status1"}`),
+			},
+			newSV: &condition.StatusValue{
+				State:  string(condition.Active),
+				Status: json.RawMessage(`{"msg":"status2"}`),
+			},
+			expectedSV: &condition.StatusValue{
+				WorkerID:  "worker1",
+				Target:    "target1",
+				TraceID:   "trace1",
+				SpanID:    "span1",
+				State:     string(condition.Active),
+				Status:    json.RawMessage(`{"msg":"status2"}`),
+				UpdatedAt: time.Now(),
+			},
+		},
+		{
+			name: "Error returned when update on a finalized condition",
+			curSV: &condition.StatusValue{
+				WorkerID: "worker1",
+				Target:   "target1",
+				TraceID:  "trace1",
+				SpanID:   "span1",
+				State:    string(condition.Succeeded),
+				Status:   json.RawMessage(`{"msg":"status1"}`),
+			},
+			newSV: &condition.StatusValue{
+				State:  string(condition.Active),
+				Status: json.RawMessage(`{"msg":"status2"}`),
+			},
+			expectedSV:          nil,
+			expectedErrContains: "invalid update, condition state already finalized",
+		},
+		{
+			name: "Error returned for invalid current Status JSON",
+			curSV: &condition.StatusValue{
+				WorkerID: "worker1",
+				Target:   "target1",
+				TraceID:  "trace1",
+				SpanID:   "span1",
+				State:    string(condition.Active),
+				Status:   json.RawMessage(`{"msg":"status1}`),
+			},
+			newSV: &condition.StatusValue{
+				State:  string(condition.Active),
+				Status: json.RawMessage(`{"msg":"status2"}`),
+			},
+			expectedSV:          nil,
+			expectedErrContains: "current StatusValue unmarshal error",
+		},
+		{
+			name: "Error returned for invalid new Status JSON",
+			curSV: &condition.StatusValue{
+				WorkerID: "worker1",
+				Target:   "target1",
+				TraceID:  "trace1",
+				SpanID:   "span1",
+				State:    string(condition.Active),
+				Status:   json.RawMessage(`{"msg":"status1"}`),
+			},
+			newSV: &condition.StatusValue{
+				State:  string(condition.Active),
+				Status: json.RawMessage(`{"msg":"status2}`),
+			},
+			expectedSV:          nil,
+			expectedErrContains: "new StatusValue unmarshal error",
+		},
+		{
+			name: "Empty status update does not overwrite current",
+			curSV: &condition.StatusValue{
+				WorkerID: "worker1",
+				Target:   "target1",
+				TraceID:  "trace1",
+				SpanID:   "span1",
+				State:    string(condition.Active),
+				Status:   json.RawMessage(`{"msg":"hello"}`),
+			},
+			newSV: &condition.StatusValue{
+				State:  string(condition.Active),
+				Status: json.RawMessage(`{}`),
+			},
+			expectedSV: &condition.StatusValue{
+				WorkerID:  "worker1",
+				Target:    "target1",
+				TraceID:   "trace1",
+				SpanID:    "span1",
+				State:     string(condition.Active),
+				Status:    json.RawMessage(`{"msg":"hello"}`),
+				UpdatedAt: time.Now(),
+			},
+		},
+		{
+			name: "Empty new State does not overwrite current",
+			curSV: &condition.StatusValue{
+				WorkerID: "worker1",
+				Target:   "target1",
+				TraceID:  "trace1",
+				SpanID:   "span1",
+				State:    string(condition.Active),
+				Status:   json.RawMessage(`{"msg":"hello"}`),
+			},
+			newSV: &condition.StatusValue{
+				Status: json.RawMessage(`{"msg": "hello 2"}`),
+			},
+			expectedSV: &condition.StatusValue{
+				WorkerID:  "worker1",
+				Target:    "target1",
+				TraceID:   "trace1",
+				SpanID:    "span1",
+				State:     string(condition.Active),
+				Status:    json.RawMessage(`{"msg":"hello 2"}`),
+				UpdatedAt: time.Now(),
+			},
+		},
+		{
+			name: "No update when status is equal",
+			curSV: &condition.StatusValue{
+				WorkerID: "worker1",
+				Target:   "target1",
+				TraceID:  "trace1",
+				SpanID:   "span1",
+				State:    string(condition.Active),
+				Status:   json.RawMessage(`{"msg":"same"}`),
+			},
+			newSV: &condition.StatusValue{
+				State:  string(condition.Active),
+				Status: json.RawMessage(`{"msg":"same"}`),
+			},
+			expectedSV: &condition.StatusValue{
+				WorkerID:  "worker1",
+				Target:    "target1",
+				TraceID:   "trace1",
+				SpanID:    "span1",
+				State:     string(condition.Active),
+				Status:    json.RawMessage(`{"msg":"same"}`),
+				UpdatedAt: time.Now(),
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gotSV, err := statusValueUpdate(tt.curSV, tt.newSV)
+
+			if tt.expectedErrContains != "" {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.expectedErrContains)
+			} else {
+				require.NoError(t, err)
+				assert.Equal(t, tt.expectedSV.WorkerID, gotSV.WorkerID)
+				assert.Equal(t, tt.expectedSV.Target, gotSV.Target)
+				assert.Equal(t, tt.expectedSV.TraceID, gotSV.TraceID)
+				assert.Equal(t, tt.expectedSV.SpanID, gotSV.SpanID)
+				assert.Equal(t, tt.expectedSV.State, gotSV.State)
+				assert.JSONEq(t, string(tt.expectedSV.Status), string(gotSV.Status))
+				assert.WithinDuration(t, tt.expectedSV.UpdatedAt, gotSV.UpdatedAt, time.Second)
 			}
 		})
 	}
