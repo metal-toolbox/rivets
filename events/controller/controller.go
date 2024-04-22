@@ -233,7 +233,6 @@ Loop:
 			if err := n.processEvents(ctx); err != nil {
 				return errors.Wrap(errListenEvents, err.Error())
 			}
-
 		case <-ctx.Done():
 			if n.dispatched > 0 {
 				continue
@@ -475,6 +474,7 @@ func (n *NatsController) runConditionHandlerWithMonitor(ctx context.Context, con
 			select {
 			case <-ticker.C:
 				eventStatusSet.inProgress()
+				conditionStatusPublisher.UpdateTimestamp(ctx)
 			case <-doneCh:
 				break Loop
 			}

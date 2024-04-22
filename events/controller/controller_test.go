@@ -275,6 +275,7 @@ func TestRunConditionHandlerWithMonitor(t *testing.T) {
 	ctx := context.Background()
 	cond := &condition.Condition{Kind: condition.FirmwareInstall}
 	publisher := NewMockConditionStatusPublisher(t)
+	publisher.On("UpdateTimestamp", mock.Anything).Return(nil)
 
 	message := events.NewMockMessage(t)
 	message.On("InProgress").Return(nil)
@@ -304,6 +305,9 @@ func TestRunConditionHandlerWithMonitor(t *testing.T) {
 
 	message.AssertExpectations(t)
 	handler.AssertExpectations(t)
+	publisher.AssertExpectations(t)
 	assert.GreaterOrEqual(t, len(message.Calls), 9, "expect multiple ackInprogress")
+	assert.GreaterOrEqual(t, len(publisher.Calls), 9, "expect multiple condition TS updates")
 	assert.Equal(t, 1, len(handler.Calls), "expect handler to be called once")
+
 }
