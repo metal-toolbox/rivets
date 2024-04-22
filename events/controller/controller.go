@@ -31,7 +31,7 @@ const (
 	// Default concurrency
 	concurrency = 2
 	// event ACK in progress interval
-	ackInProgressInterval = 1 * time.Second
+	ackInProgressInterval = 30 * time.Second
 	// controller check in interval
 	checkinInterval = 30 * time.Second
 	// default number of KV replicas for created NATS buckets
