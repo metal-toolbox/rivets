@@ -21,11 +21,11 @@ import (
 )
 
 var (
-	kvTTL             = 10 * 24 * time.Hour
-	errGetKey         = errors.New("error fetching existing key, value for update")
-	errUnmarshalKey   = errors.New("error unmarshal key, value for update")
-	errWorkerMismatch = errors.New("condition worker mismatch error")
-	errStatusValue    = errors.New("condition status value error")
+	kvTTL                 = 10 * 24 * time.Hour
+	errGetKey             = errors.New("error fetching existing key, value for update")
+	errUnmarshalKey       = errors.New("error unmarshal key, value for update")
+	errControllerMismatch = errors.New("condition controller mismatch error")
+	errStatusValue        = errors.New("condition status value error")
 )
 
 // ConditionStatusPublisher defines an interface for publishing status updates for conditions.
@@ -186,7 +186,7 @@ func (s *NatsConditionStatusPublisher) update(key string, newStatusValue *condit
 	}
 
 	if curStatusValue.WorkerID != s.controllerID {
-		return 0, errors.Wrap(errWorkerMismatch, curStatusValue.WorkerID)
+		return 0, errors.Wrap(errControllerMismatch, curStatusValue.WorkerID)
 	}
 
 	var update *condition.StatusValue
