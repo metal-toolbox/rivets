@@ -110,6 +110,9 @@ type Condition struct {
 	// ID is the identifier for this condition.
 	ID uuid.UUID `json:"id"`
 
+	// Target is the identifier for the target server this Condition is applicable for.
+	Target uuid.UUID `json:"target"`
+
 	// Kind is one of Kind.
 	Kind Kind `json:"kind,omitempty"`
 
