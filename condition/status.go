@@ -163,3 +163,83 @@ func CheckConditionInProgress(conditionID, facilityCode, kvBucket string, js nat
 		return Indeterminate, newErrQueryStatus(errWorker, kvBucket, lookupKey, sv.WorkerID)
 	}
 }
+
+func NewTaskStatusRecord(s string) StatusRecord {
+	sr := StatusRecord{}
+	if s == "" {
+		return sr
+	}
+
+	sr.Append(s)
+
+	return sr
+}
+
+var (
+	ErrInvalidStatusRecord = errors.New("invalid status record")
+)
+
+// StatusRecord holds status information for a Condition
+type StatusRecord struct {
+	StatusMsgs []StatusMsg `json:"records"`
+}
+
+// StatusMsg is a single record within the StatusRecord
+type StatusMsg struct {
+	Timestamp time.Time `json:"ts,omitempty"`
+	Msg       string    `json:"msg,omitempty"`
+}
+
+func (sr *StatusRecord) Append(s string) {
+	if s == "" {
+		return
+	}
+
+	for _, r := range sr.StatusMsgs {
+		if r.Msg == s {
+			return
+		}
+	}
+
+	if len(sr.StatusMsgs) > 4 {
+		sr.StatusMsgs = sr.StatusMsgs[1:]
+	}
+
+	n := StatusMsg{Timestamp: time.Now(), Msg: s}
+
+	sr.StatusMsgs = append(sr.StatusMsgs, n)
+}
+
+func (sr *StatusRecord) Last() string {
+	if len(sr.StatusMsgs) == 0 {
+		return ""
+	}
+
+	return sr.StatusMsgs[len(sr.StatusMsgs)-1].Msg
+}
+
+func (sr *StatusRecord) Update(currentMsg, newMsg string) {
+	for idx, r := range sr.StatusMsgs {
+		if r.Msg == currentMsg {
+			sr.StatusMsgs[idx].Msg = newMsg
+		}
+	}
+}
+
+func (sr *StatusRecord) MustMarshal() json.RawMessage {
+	b, err := json.Marshal(sr)
+	if err != nil {
+		panic(err)
+	}
+
+	return b
+}
+
+func StatusRecordFromMessage(m json.RawMessage) (*StatusRecord, error) {
+	sr := &StatusRecord{}
+	if err := json.Unmarshal(m, sr); err != nil {
+		return nil, errors.Wrap(ErrInvalidStatusRecord, err.Error())
+	}
+
+	return sr, nil
+}
