@@ -34,6 +34,8 @@ const (
 	ackInProgressInterval = 30 * time.Second
 	// controller check in interval
 	checkinInterval = 30 * time.Second
+	//  controller considered dead after this period
+	LivenessStaleThreshold = checkinInterval * 4
 	// default number of KV replicas for created NATS buckets
 	kvReplicationFactor = 3
 )

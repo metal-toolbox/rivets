@@ -28,7 +28,7 @@ func (n *NatsController) checkinKVOpts() []kv.Option {
 	return opts
 }
 
-// This starts a go-routine to peridocally check in with the NATS kv
+// This starts a go-routine to peridically check in with the NATS kv
 func (n *NatsController) startLivenessCheckin(ctx context.Context) {
 	once.Do(func() {
 		n.controllerID = registry.GetID(n.hostname)
