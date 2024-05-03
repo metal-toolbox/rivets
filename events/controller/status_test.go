@@ -91,7 +91,8 @@ func TestPublish(t *testing.T) {
 	// publish pending status
 	require.NotPanics(t,
 		func() {
-			publisher.Publish(context.Background(), serverID.String(), condition.Pending, []byte(`{"pending...": "true"}`))
+			errP := publisher.Publish(context.Background(), serverID.String(), condition.Pending, []byte(`{"pending...": "true"}`))
+			require.NoError(t, errP)
 		},
 		"publish pending",
 	)
@@ -112,7 +113,9 @@ func TestPublish(t *testing.T) {
 	// publish active status
 	require.NotPanics(t,
 		func() {
-			publisher.Publish(context.Background(), serverID.String(), condition.Active, []byte(`{"active...": "true"}`))
+			errP := publisher.Publish(context.Background(), serverID.String(), condition.Active, []byte(`{"active...": "true"}`))
+			require.NoError(t, errP)
+
 		},
 		"publish active",
 	)

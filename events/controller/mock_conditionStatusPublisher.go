@@ -26,8 +26,21 @@ func (_m *MockConditionStatusPublisher) EXPECT() *MockConditionStatusPublisher_E
 }
 
 // Publish provides a mock function with given fields: ctx, serverID, state, status
-func (_m *MockConditionStatusPublisher) Publish(ctx context.Context, serverID string, state condition.State, status json.RawMessage) {
-	_m.Called(ctx, serverID, state, status)
+func (_m *MockConditionStatusPublisher) Publish(ctx context.Context, serverID string, state condition.State, status json.RawMessage) error {
+	ret := _m.Called(ctx, serverID, state, status)
+
+	if len(ret) == 0 {
+		panic("no return value specified for Publish")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, condition.State, json.RawMessage) error); ok {
+		r0 = rf(ctx, serverID, state, status)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
 }
 
 // MockConditionStatusPublisher_Publish_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Publish'
@@ -51,12 +64,12 @@ func (_c *MockConditionStatusPublisher_Publish_Call) Run(run func(ctx context.Co
 	return _c
 }
 
-func (_c *MockConditionStatusPublisher_Publish_Call) Return() *MockConditionStatusPublisher_Publish_Call {
-	_c.Call.Return()
+func (_c *MockConditionStatusPublisher_Publish_Call) Return(_a0 error) *MockConditionStatusPublisher_Publish_Call {
+	_c.Call.Return(_a0)
 	return _c
 }
 
-func (_c *MockConditionStatusPublisher_Publish_Call) RunAndReturn(run func(context.Context, string, condition.State, json.RawMessage)) *MockConditionStatusPublisher_Publish_Call {
+func (_c *MockConditionStatusPublisher_Publish_Call) RunAndReturn(run func(context.Context, string, condition.State, json.RawMessage) error) *MockConditionStatusPublisher_Publish_Call {
 	_c.Call.Return(run)
 	return _c
 }
