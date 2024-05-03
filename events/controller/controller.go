@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"os"
+	"runtime/debug"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -510,6 +511,36 @@ func (n *NatsController) runConditionHandlerWithMonitor(ctx context.Context, con
 
 	go monitor()
 	defer close(doneCh)
+
+	// panic handler
+	defer func() {
+		if rec := recover(); rec != nil {
+			// overwrite returned err - declared in func signature
+			err = errors.New("Panic occurred while running Condition handler")
+			n.logger.Printf("!!panic %s: %s", rec, debug.Stack())
+			n.logger.Error(err)
+
+			// append to existing status record, unless it was overwritten by the controller somehow
+			statusRecord, errSR := condition.StatusRecordFromMessage(cond.Status)
+			if errSR != nil {
+				n.logger.WithError(errSR).WithFields(logrus.Fields{
+					"condition.id": cond.ID.String(),
+				}).Warn("error parsing existing status record from condition")
+			} else {
+				statusRecord.Append("Fatal error running Condition, check logs for details")
+			}
+
+			// publish failed state, status
+			//
+			// Publish logs error internally
+			_ = conditionStatusPublisher.Publish(
+				ctx,
+				cond.Target.String(),
+				condition.Failed,
+				statusRecord.MustMarshal(),
+			)
+		}
+	}() // nolint:errcheck // nope
 
 	return n.conditionHandlerFactory().Handle(ctx, cond, conditionStatusPublisher)
 }

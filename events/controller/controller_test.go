@@ -274,40 +274,118 @@ func TestRunConditionHandlerWithMonitor(t *testing.T) {
 	// test monitor calls ackInprogress
 	ctx := context.Background()
 	cond := &condition.Condition{Kind: condition.FirmwareInstall}
-	publisher := NewMockConditionStatusPublisher(t)
-	publisher.On("UpdateTimestamp", mock.Anything).Return(nil)
 
-	message := events.NewMockMessage(t)
-	message.On("InProgress").Return(nil)
+	testcases := []struct {
+		name            string
+		mocksetup       func() (*MockConditionHandler, *events.MockMessage, *MockConditionStatusPublisher)
+		publishInterval time.Duration
+		wantErr         bool
+	}{
+		{
+			name: "handler executed successfully",
+			mocksetup: func() (*MockConditionHandler, *events.MockMessage, *MockConditionStatusPublisher) {
+				publisher := NewMockConditionStatusPublisher(t)
+				message := events.NewMockMessage(t)
+				handler := NewMockConditionHandler(t)
 
-	handler := NewMockConditionHandler(t)
-	handler.On("Handle", mock.Anything, cond, publisher).Times(1).
-		//  sleep for 100ms
-		Run(func(_ mock.Arguments) { time.Sleep(100 * time.Millisecond) }).
-		Return(nil)
+				handler.On("Handle", mock.Anything, cond, publisher).Times(1).
+					//  sleep for 100ms
+					Run(func(_ mock.Arguments) { time.Sleep(100 * time.Millisecond) }).
+					Return(nil)
 
-	n := &NatsController{
-		logger: logrus.New(),
-		conditionHandlerFactory: func() ConditionHandler {
-			return handler
+				message.On("Ack").Return(nil)
+				publisher.On("UpdateTimestamp", mock.Anything).Return(nil)
+				publisher.On("Publish", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
+
+				return handler, message, publisher
+			},
+			publishInterval: 10 * time.Millisecond,
+		},
+		{
+			name: "handler returns error",
+			mocksetup: func() (*MockConditionHandler, *events.MockMessage, *MockConditionStatusPublisher) {
+				publisher := NewMockConditionStatusPublisher(t)
+				message := events.NewMockMessage(t)
+				handler := NewMockConditionHandler(t)
+
+				handler.On("Handle", mock.Anything, cond, publisher).Times(1).
+					Return(errors.New("barf"))
+
+				message.On("Ack").Return(nil)
+				publisher.On("Publish", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
+
+				return handler, message, publisher
+			},
+			publishInterval: 30 * time.Second,
+			wantErr:         true,
+		},
+		{
+			name: "status publish fails",
+			mocksetup: func() (*MockConditionHandler, *events.MockMessage, *MockConditionStatusPublisher) {
+				publisher := NewMockConditionStatusPublisher(t)
+				message := events.NewMockMessage(t)
+				handler := NewMockConditionHandler(t)
+
+				message.On("Nak").Return(nil)
+				publisher.On("Publish", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(errors.New("barf"))
+
+				return handler, message, publisher
+			},
+			publishInterval: 30 * time.Second,
+			wantErr:         true,
+		},
+		{
+			name: "handler panic",
+			mocksetup: func() (*MockConditionHandler, *events.MockMessage, *MockConditionStatusPublisher) {
+				publisher := NewMockConditionStatusPublisher(t)
+				message := events.NewMockMessage(t)
+				handler := NewMockConditionHandler(t)
+
+				handler.On("Handle", mock.Anything, cond, publisher).Times(1).
+					Run(func(_ mock.Arguments) { panic("oops") })
+
+				message.On("Ack").Return(nil)
+				publisher.On("Publish", mock.Anything, mock.Anything, condition.Pending, mock.Anything).Return(nil)
+				publisher.On("Publish", mock.Anything, mock.Anything, condition.Failed, mock.Anything).Return(nil)
+
+				return handler, message, publisher
+			},
+			publishInterval: 30 * time.Second,
+			wantErr:         true,
 		},
 	}
 
-	gotErr := n.runConditionHandlerWithMonitor(
-		ctx,
-		cond,
-		n.newNatsEventStatusAcknowleger(message),
-		publisher,
-		10*time.Millisecond, // ack every 10ms
-	)
+	for _, tt := range testcases {
+		t.Run(tt.name, func(t *testing.T) {
+			handler, message, publisher := tt.mocksetup()
+			l := logrus.New()
+			l.Level = 0 // set higher value to debug
+			n := &NatsController{
+				logger: l,
+				conditionHandlerFactory: func() ConditionHandler {
+					return handler
+				},
+			}
 
-	assert.Nil(t, gotErr)
+			err := n.runConditionHandlerWithMonitor(
+				ctx,
+				cond,
+				n.newNatsEventStatusAcknowleger(message),
+				publisher,
+				tt.publishInterval,
+			)
 
-	message.AssertExpectations(t)
-	handler.AssertExpectations(t)
-	publisher.AssertExpectations(t)
-	assert.GreaterOrEqual(t, len(message.Calls), 9, "expect multiple ackInprogress")
-	assert.GreaterOrEqual(t, len(publisher.Calls), 9, "expect multiple condition TS updates")
-	assert.Equal(t, 1, len(handler.Calls), "expect handler to be called once")
+			if tt.wantErr {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+				handler.AssertExpectations(t)
+				assert.GreaterOrEqual(t, len(publisher.Calls), 9, "expect multiple condition TS updates")
+				assert.Equal(t, 1, len(handler.Calls), "expect handler to be called once")
+			}
 
+			message.AssertExpectations(t)
+			publisher.AssertExpectations(t)
+		})
+	}
 }
