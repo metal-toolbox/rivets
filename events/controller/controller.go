@@ -398,13 +398,13 @@ func (n *NatsController) processCondition(
 		eventAcknowleger.inProgress()
 		spanEvent(span, cond, n.controllerID.String(), "restarting condition")
 
-		// we need to restart this event
+	// we need to restart this event
 	case notStarted:
 		n.logger.WithField("conditionID", cond.ID.String()).Info("starting new condition")
 		eventAcknowleger.inProgress()
 		spanEvent(span, cond, n.controllerID.String(), "start new condition")
 
-		// break out here, this is a new event
+	// break out here, this is a new event
 	case indeterminate:
 		n.logger.WithField("conditionID", cond.ID.String()).Warn("unable to determine state of this condition")
 		// send it back to NATS to try again
@@ -421,22 +421,15 @@ func (n *NatsController) processCondition(
 	if errHandler != nil {
 		registerConditionRuntimeMetric(startTS, string(condition.Failed))
 
-		// handler indicates it must be retried
+		// handler indicates this must be retried
 		if errors.Is(errHandler, ErrRetryHandler) {
 			n.logger.WithError(errHandler).Warn("condition handler returned retry error")
-			metricsEventsCounter(true, "nack")
-			eventAcknowleger.nak() // have the message bus re-deliver the message
-			spanEvent(
-				span,
-				cond,
-				n.controllerID.String(),
-				"sent nak, callback returned error: "+errHandler.Error(),
-			)
 
+			// TODO: write this condition back onto the Jetstream so its retried
 			return
 		}
 
-		// other errors are logged and event is ack'd as complete
+		// other errors are logged
 		n.logger.WithError(errHandler).Error("condition handler returned error")
 		spanEvent(
 			span,

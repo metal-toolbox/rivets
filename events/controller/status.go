@@ -414,8 +414,11 @@ func (p *NatsConditionStatusQueryor) ConditionState(conditionID string) Conditio
 
 // eventStatusAcknowleger provides an interface for acknowledging the status of events in a NATS JetStream.
 type eventStatusAcknowleger interface {
+	// inProgress marks the event as being in progress in the NATS JetStream.
 	inProgress()
+	// complete marks the event as complete in the NATS JetStream.
 	complete()
+	// nak sends a negative acknowledgment for the event in the NATS JetStream, indicating it requires further handling.
 	nak()
 }
 
