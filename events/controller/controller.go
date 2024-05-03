@@ -446,22 +446,46 @@ func (n *NatsController) processCondition(
 	}
 
 	registerConditionRuntimeMetric(startTS, string(condition.Succeeded))
-	metricsEventsCounter(true, "ack")
-	eventAcknowleger.complete()
+
 	spanEvent(
 		span,
 		cond,
 		n.controllerID.String(),
-		"sent ack, condition complete",
+		"condition complete",
 	)
 }
 
-func (n *NatsController) runConditionHandlerWithMonitor(ctx context.Context, cond *condition.Condition, eventStatusSet eventStatusAcknowleger, conditionStatusPublisher ConditionStatusPublisher, ackInterval time.Duration) error {
+func (n *NatsController) runConditionHandlerWithMonitor(ctx context.Context, cond *condition.Condition, eventStatusSet eventStatusAcknowleger, conditionStatusPublisher ConditionStatusPublisher, ackInterval time.Duration) (err error) {
 	ctx, span := otel.Tracer(pkgName).Start(
 		ctx,
 		"runConditionHandlerWithMonitor",
 	)
 	defer span.End()
+
+	// create first record of condition in controller KV
+	//
+	// failure to publish the first status KV record is fatal
+	status := condition.NewTaskStatusRecord("In process by controller: " + n.hostname)
+	cond.Status = status.MustMarshal()
+	if err = conditionStatusPublisher.Publish(
+		ctx,
+		cond.Target.String(),
+		condition.Pending,
+		cond.Status,
+	); err != nil {
+		n.logger.WithError(err).WithFields(logrus.Fields{
+			"condition.id": cond.ID.String(),
+		}).Warn("error publishing first KV status record, condition aborted")
+
+		// send this message back on the bus to be redelivered, or atleast attempt to.
+		eventStatusSet.nak()
+		metricsEventsCounter(true, "nack")
+
+		return err
+	}
+
+	// mark message as complete as the status KV record is in place
+	eventStatusSet.complete()
 
 	// doneCh indicates the handler run completed
 	doneCh := make(chan bool)
@@ -471,11 +495,12 @@ func (n *NatsController) runConditionHandlerWithMonitor(ctx context.Context, con
 		ticker := time.NewTicker(ackInterval)
 		defer ticker.Stop()
 
+		// periodically update the LastUpdate TS in status KV,
+		/// which keeps the Orchestrator from reconciling this condition.
 	Loop:
 		for {
 			select {
 			case <-ticker.C:
-				eventStatusSet.inProgress()
 				conditionStatusPublisher.UpdateTimestamp(ctx)
 			case <-doneCh:
 				break Loop
