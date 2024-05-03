@@ -166,32 +166,40 @@ func TestProcessCondition(t *testing.T) {
 			eStatusAcknowledger := NewMockeventStatusAcknowleger(t)
 			eStatusAcknowledger.On(tt.expectMethod).Return()
 
+			var cStatusPublisher *MockConditionStatusPublisher
+
 			handler := NewMockConditionHandler(t)
 			// expect handler, completions for orphaned and notStarted conditions
 			if tt.state == orphaned || tt.state == notStarted {
+				eStatusAcknowledger.On("complete").Return()
+
 				if tt.handlerErr == nil {
 					// no handler errors
 					handler.On("Handle", mock.Anything, mock.Anything, mock.Anything).Return(nil)
-					eStatusAcknowledger.On("complete").Return()
 				} else {
 					// handler errors
 					if errors.Is(tt.handlerErr, ErrRetryHandler) {
+						// TODO: replace with mock Jetstream publish handler
 						handler.On("Handle", mock.Anything, mock.Anything, mock.Anything).Return(tt.handlerErr)
-						eStatusAcknowledger.On("nak").Return()
 					} else {
 						handler.On("Handle", mock.Anything, mock.Anything, mock.Anything).Return(errors.New("some other error"))
-						eStatusAcknowledger.On("complete").Return()
 					}
 				}
+
+				// expect to publish status in these states
+				cStatusPublisher = NewMockConditionStatusPublisher(t)
+				cStatusPublisher.On("Publish", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
 			}
 
+			l := logrus.New()
+			l.Level = 0 // set higher value to debug
 			n := &NatsController{
-				logger:                  logrus.New(),
+				logger:                  l,
 				controllerID:            registry.GetID("mock"),
 				conditionHandlerFactory: func() ConditionHandler { return handler },
 			}
 
-			n.processCondition(context.Background(), cond, eStatusAcknowledger, cStatusQueryor, nil)
+			n.processCondition(context.Background(), cond, eStatusAcknowledger, cStatusQueryor, cStatusPublisher)
 
 			eStatusAcknowledger.AssertCalled(t, tt.expectMethod)
 			cStatusQueryor.AssertExpectations(t)
