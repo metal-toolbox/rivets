@@ -26,11 +26,12 @@ var (
 	errUnmarshalKey       = errors.New("error unmarshal key, value for update")
 	errControllerMismatch = errors.New("condition controller mismatch error")
 	errStatusValue        = errors.New("condition status value error")
+	errStatusPublish      = errors.New("condition status publish error")
 )
 
 // ConditionStatusPublisher defines an interface for publishing status updates for conditions.
 type ConditionStatusPublisher interface {
-	Publish(ctx context.Context, serverID string, state condition.State, status json.RawMessage)
+	Publish(ctx context.Context, serverID string, state condition.State, status json.RawMessage) error
 	UpdateTimestamp(ctx context.Context)
 }
 
@@ -113,7 +114,7 @@ func (s *NatsConditionStatusPublisher) UpdateTimestamp(ctx context.Context) {
 }
 
 // Publish implements the StatusPublisher interface. It serializes and publishes the current status of a condition to NATS.
-func (s *NatsConditionStatusPublisher) Publish(ctx context.Context, serverID string, state condition.State, status json.RawMessage) {
+func (s *NatsConditionStatusPublisher) Publish(ctx context.Context, serverID string, state condition.State, status json.RawMessage) error {
 	_, span := otel.Tracer(pkgName).Start(
 		ctx,
 		"controller.Publish.KV",
@@ -159,8 +160,9 @@ func (s *NatsConditionStatusPublisher) Publish(ctx context.Context, serverID str
 			"lastRev":           s.lastRev,
 			"controllerID":      s.controllerID,
 			"key":               key,
-		}).Warn("unable to write task status")
-		return
+		}).Warn("Condition status publish failed")
+
+		return errors.Wrap(errStatusPublish, err.Error())
 	}
 
 	s.lastRev = rev
@@ -170,7 +172,9 @@ func (s *NatsConditionStatusPublisher) Publish(ctx context.Context, serverID str
 		"taskID":            s.conditionID,
 		"lastRev":           s.lastRev,
 		"key":               key,
-	}).Trace("published task status")
+	}).Trace("Condition status published")
+
+	return nil
 }
 
 func (s *NatsConditionStatusPublisher) update(key string, newStatusValue *condition.StatusValue, onlyTimestamp bool) (uint64, error) {
