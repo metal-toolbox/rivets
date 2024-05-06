@@ -50,6 +50,7 @@ const (
 
 // StatusValue is the canonical structure for reporting status of an ongoing task
 type StatusValue struct {
+	CreatedAt  time.Time       `json:"created"`
 	UpdatedAt  time.Time       `json:"updated"`
 	WorkerID   string          `json:"worker"`
 	Target     string          `json:"target"`
