@@ -137,6 +137,7 @@ func (s *NatsConditionStatusPublisher) Publish(ctx context.Context, serverID str
 	var err error
 	var rev uint64
 	if s.lastRev == 0 {
+		sv.CreatedAt = time.Now()
 		rev, err = s.kv.Create(key, sv.MustBytes())
 	} else {
 		rev, err = s.update(key, sv, false)
