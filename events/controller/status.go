@@ -21,12 +21,13 @@ import (
 )
 
 var (
-	kvTTL                 = 10 * 24 * time.Hour
-	errGetKey             = errors.New("error fetching existing key, value for update")
-	errUnmarshalKey       = errors.New("error unmarshal key, value for update")
-	errControllerMismatch = errors.New("condition controller mismatch error")
-	errStatusValue        = errors.New("condition status value error")
-	errStatusPublish      = errors.New("condition status publish error")
+	kvTTL                  = 10 * 24 * time.Hour
+	errGetKey              = errors.New("error fetching existing key, value for update")
+	errUnmarshalKey        = errors.New("error unmarshal key, value for update")
+	errControllerMismatch  = errors.New("condition controller mismatch error")
+	errStatusValue         = errors.New("condition status value error")
+	errStatusPublish       = errors.New("condition status publish error")
+	errStatusPublisherInit = errors.New("error initializing new publisher")
 )
 
 // ConditionStatusPublisher defines an interface for publishing status updates for conditions.
@@ -61,12 +62,28 @@ func (n *NatsController) NewNatsConditionStatusPublisher(conditionID string) (*N
 		return nil, errors.Wrap(errKV, err.Error())
 	}
 
+	// retrieve current key revision if key exists
+	ckey := key(n.facilityCode, conditionID)
+	currStatusEntry, errGet := statusKV.Get(ckey)
+	if errGet != nil && !errors.Is(errGet, nats.ErrKeyNotFound) {
+		return nil, errors.Wrap(
+			errStatusPublisherInit,
+			fmt.Sprintf("key: %s, error: %s", ckey, errGetKey.Error()),
+		)
+	}
+
+	var lastRev uint64
+	if currStatusEntry != nil {
+		lastRev = currStatusEntry.Revision()
+	}
+
 	return &NatsConditionStatusPublisher{
 		facilityCode: n.facilityCode,
 		conditionID:  conditionID,
 		controllerID: n.controllerID.String(),
 		kv:           statusKV,
 		log:          n.logger,
+		lastRev:      lastRev,
 	}, nil
 }
 

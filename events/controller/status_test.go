@@ -57,6 +57,63 @@ func shutdownJetStream(t *testing.T, s *server.Server) {
 	s.WaitForShutdown()
 }
 
+func TestNewNatsConditionStatusPublisher(t *testing.T) {
+	srv := startJetStreamServer(t)
+	defer shutdownJetStream(t, srv)
+	natsConn, _ := jetStreamContext(t, srv) // nc is closed on evJS.Close(), js needs no cleanup
+	evJS := events.NewJetstreamFromConn(natsConn)
+	defer evJS.Close()
+
+	cond := &condition.Condition{
+		Kind: condition.FirmwareInstall,
+		ID:   uuid.New(),
+	}
+
+	const facilityCode = "fac13"
+
+	controller := &NatsController{
+		stream:        evJS,
+		facilityCode:  facilityCode,
+		controllerID:  registry.GetID("kvtest"),
+		conditionKind: cond.Kind,
+		logger:        logrus.New(),
+	}
+
+	// test happy case
+	publisher, err := controller.NewNatsConditionStatusPublisher(cond.ID.String())
+	require.Nil(t, err)
+	require.NotNil(t, publisher, "publisher constructor")
+
+	assert.Equal(t, controller.facilityCode, publisher.facilityCode)
+	assert.Equal(t, cond.ID.String(), publisher.conditionID)
+	assert.Equal(t, controller.logger, publisher.log)
+
+	// Test re-initialized publisher will set lastRev to KV revision and subsequent publishes work
+	serverID := uuid.New()
+	require.NotPanics(t,
+		func() {
+			errP := publisher.Publish(context.Background(), serverID.String(), condition.Pending, []byte(`{"pending...": "true"}`))
+			require.NoError(t, errP)
+		},
+		"publish 1",
+	)
+	require.Equal(t, uint64(1), publisher.lastRev)
+
+	publisher, err = controller.NewNatsConditionStatusPublisher(cond.ID.String())
+	require.Nil(t, err)
+	require.NotNil(t, publisher, "publisher constructor")
+	require.Equal(t, uint64(1), publisher.lastRev)
+
+	require.NotPanics(t,
+		func() {
+			errP := publisher.Publish(context.Background(), serverID.String(), condition.Active, []byte(`{"some work...": "true"}`))
+			require.NoError(t, errP)
+		},
+		"publish 2",
+	)
+	require.Equal(t, uint64(2), publisher.lastRev)
+}
+
 func TestPublish(t *testing.T) {
 	srv := startJetStreamServer(t)
 	defer shutdownJetStream(t, srv)
