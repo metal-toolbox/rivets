@@ -31,8 +31,11 @@ const (
 	pullEventTimeout = 5 * time.Second
 	// Default concurrency
 	concurrency = 2
-	// event ACK in progress interval
-	ackInProgressInterval = 30 * time.Second
+	// periodically publish an updated status
+	statusInterval = 30 * time.Second
+	// condition status considered stale after this period
+	StatusStaleThreshold = statusInterval * 4
+
 	// controller check in interval
 	checkinInterval = 30 * time.Second
 	//  controller considered dead after this period
@@ -417,7 +420,7 @@ func (n *NatsController) processCondition(
 	handlerCtx, cancel := context.WithTimeout(ctx, n.handlerTimeout)
 	defer cancel()
 
-	errHandler := n.runConditionHandlerWithMonitor(handlerCtx, cond, eventAcknowleger, conditionStatusPublisher, ackInProgressInterval)
+	errHandler := n.runConditionHandlerWithMonitor(handlerCtx, cond, eventAcknowleger, conditionStatusPublisher, statusInterval)
 	if errHandler != nil {
 		registerConditionRuntimeMetric(startTS, string(condition.Failed))
 
@@ -449,7 +452,7 @@ func (n *NatsController) processCondition(
 	)
 }
 
-func (n *NatsController) runConditionHandlerWithMonitor(ctx context.Context, cond *condition.Condition, eventStatusSet eventStatusAcknowleger, conditionStatusPublisher ConditionStatusPublisher, ackInterval time.Duration) (err error) {
+func (n *NatsController) runConditionHandlerWithMonitor(ctx context.Context, cond *condition.Condition, eventStatusSet eventStatusAcknowleger, conditionStatusPublisher ConditionStatusPublisher, statusInterval time.Duration) (err error) {
 	ctx, span := otel.Tracer(pkgName).Start(
 		ctx,
 		"runConditionHandlerWithMonitor",
@@ -484,9 +487,9 @@ func (n *NatsController) runConditionHandlerWithMonitor(ctx context.Context, con
 	// doneCh indicates the handler run completed
 	doneCh := make(chan bool)
 
-	// monitor sends in progress ack's until the task handler returns.
+	// monitor updates TS on status until the task handler returns.
 	monitor := func() {
-		ticker := time.NewTicker(ackInterval)
+		ticker := time.NewTicker(statusInterval)
 		defer ticker.Stop()
 
 		// periodically update the LastUpdate TS in status KV,
