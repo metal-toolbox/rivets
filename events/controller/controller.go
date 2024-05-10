@@ -31,15 +31,14 @@ const (
 	pullEventTimeout = 5 * time.Second
 	// Default concurrency
 	concurrency = 2
-	// periodically publish an updated status
-	statusInterval = 30 * time.Second
-	// condition status considered stale after this period
-	StatusStaleThreshold = statusInterval * 4
-
 	// controller check in interval
 	checkinInterval = 30 * time.Second
+	// periodically publish an updated status
+	statusInterval = checkinInterval
+	// condition status considered stale after this period
+	StatusStaleThreshold = condition.StaleThreshold
 	//  controller considered dead after this period
-	LivenessStaleThreshold = checkinInterval * 4
+	LivenessStaleThreshold = condition.StaleThreshold
 	// default number of KV replicas for created NATS buckets
 	kvReplicationFactor = 3
 )
