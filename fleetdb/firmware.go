@@ -138,3 +138,34 @@ func FirmwareSetByVendorModel(ctx context.Context, vendor, model string, client 
 
 	return fwSet, nil
 }
+
+// FirmwareSetByVendorModel returns the firmware set matched by the vendor, model and labels attributes
+func FirmwareSetByLabels(ctx context.Context, vendor, model string, labels map[string]string, client *fleetdbapi.Client) ([]fleetdbapi.ComponentFirmwareSet, error) {
+	var fwSetListparams *fleetdbapi.ComponentFirmwareSetListParams
+	labelParts := make([]string, 0)
+	for key, value := range labels {
+		labelParts = append(labelParts, fmt.Sprintf("%s=%s", key, value))
+	}
+	labelsParams := strings.Join(labelParts, ",")
+
+	// labels select requires len(AttributeListParams) = 0
+	fwSetListparams = &fleetdbapi.ComponentFirmwareSetListParams{
+		Model:  model,
+		Vendor: vendor,
+		Labels: labelsParams,
+	}
+
+	fwSet, _, err := client.ListServerComponentFirmwareSet(ctx, fwSetListparams)
+	if err != nil {
+		return []fleetdbapi.ComponentFirmwareSet{}, errors.Wrap(ErrFwSetByVendorModel, err.Error())
+	}
+
+	if len(fwSet) == 0 {
+		return []fleetdbapi.ComponentFirmwareSet{}, errors.Wrap(
+			ErrFwSetByVendorModel,
+			fmt.Sprintf("no fw sets identified for vendor: %s, model: %s", vendor, model),
+		)
+	}
+
+	return fwSet, nil
+}
