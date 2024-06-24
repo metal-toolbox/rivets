@@ -236,6 +236,10 @@ func (sr *StatusRecord) MustMarshal() json.RawMessage {
 	return b
 }
 
+func (sr *StatusRecord) Marshal() (json.RawMessage, error) {
+	return json.Marshal(sr)
+}
+
 func StatusRecordFromMessage(m json.RawMessage) (*StatusRecord, error) {
 	sr := &StatusRecord{}
 	if err := json.Unmarshal(m, sr); err != nil {
