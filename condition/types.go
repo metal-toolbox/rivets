@@ -2,6 +2,7 @@ package condition
 
 import (
 	"encoding/json"
+	"fmt"
 	"time"
 
 	"github.com/google/uuid"
@@ -138,6 +139,16 @@ type Condition struct {
 
 	// CreatedAt is when this object was created.
 	CreatedAt time.Time `json:"createdAt,omitempty"`
+}
+
+func (c *Condition) StreamPublishSubject(facilityCode string) string {
+	// note: inband install conditions are published with the serverID in the subject suffix
+	if c.Kind == FirmwareInstallInband {
+		return fmt.Sprintf("%s.servers.%s.%s", facilityCode, c.Kind, c.Target.String())
+
+	}
+
+	return fmt.Sprintf("%s.servers.%s", facilityCode, c.Kind)
 }
 
 // Fault is used to introduce faults into the controller when executing on a condition.
