@@ -41,8 +41,9 @@ var (
 )
 
 const (
-	consumerMaxDeliver = 5
-	consumerAckPolicy  = nats.AckExplicitPolicy
+	consumerMaxDeliver    = 5
+	consumerAckPolicy     = nats.AckExplicitPolicy
+	conditionJetstreamTTL = 3 * time.Hour
 )
 
 // NatsJetstream wraps the NATs JetStream connector to implement the Stream interface.
@@ -162,13 +163,6 @@ func (n *NatsJetstream) addStream() error {
 		return errors.Wrap(ErrNatsJetstreamAddStream, "Jetstream context is not setup")
 	}
 
-	// check stream isn't already present
-	for name := range n.jsctx.StreamNames() {
-		if name == n.parameters.Stream.Name {
-			return nil
-		}
-	}
-
 	var retention nats.RetentionPolicy
 
 	switch n.parameters.Stream.Retention {
@@ -182,14 +176,27 @@ func (n *NatsJetstream) addStream() error {
 		return errors.Wrap(ErrNatsConfig, "unknown retention policy defined: "+n.parameters.Stream.Retention)
 	}
 
-	_, err := n.jsctx.AddStream(
-		&nats.StreamConfig{
-			Name:      n.parameters.Stream.Name,
-			Subjects:  n.parameters.Stream.Subjects,
-			Retention: retention,
-		},
-	)
+	cfg := &nats.StreamConfig{
+		Name:        n.parameters.Stream.Name,
+		Subjects:    n.parameters.Stream.Subjects,
+		Retention:   retention,
+		AllowRollup: true, // https://docs.nats.io/nats-concepts/jetstream/streams#allowrollup
+		MaxAge:      conditionJetstreamTTL,
+	}
 
+	if n.parameters.Stream.DuplicateWindow != 0 {
+		cfg.Duplicates = n.parameters.Stream.DuplicateWindow
+	}
+
+	// check stream isn't already present
+	for name := range n.jsctx.StreamNames() {
+		if name == n.parameters.Stream.Name {
+			_, err := n.jsctx.UpdateStream(cfg)
+			return err
+		}
+	}
+
+	_, err := n.jsctx.AddStream(cfg)
 	if err != nil {
 		return errors.Wrap(ErrNatsJetstreamAddStream, err.Error())
 	}

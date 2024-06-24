@@ -201,3 +201,51 @@ func TestExtractOtelTraceContext(t *testing.T) {
 
 	assert.Contains(t, traceParent, got)
 }
+
+func Test_addStream(t *testing.T) {
+	jsSrv := natsTest.StartJetStreamServer(t)
+	defer natsTest.ShutdownJetStream(t, jsSrv)
+
+	jsConn, _ := natsTest.JetStreamContext(t, jsSrv)
+	njs := NewJetstreamFromConn(jsConn)
+	defer njs.Close()
+
+	streamName := "foo"
+	njs.parameters = &NatsOptions{
+		Stream: &NatsStreamOptions{
+			Name:             streamName,
+			Subjects:         []string{"foo.bar"},
+			Retention:        "workQueue",
+			Acknowledgements: true,
+			DuplicateWindow:  1 * time.Minute,
+		},
+	}
+
+	// test add
+	assert.Nil(t, njs.addStream())
+
+	streamInfo, err := AsNatsJetStreamContext(njs).StreamInfo(streamName)
+	assert.Nil(t, err)
+
+	// validate defaults
+	assert.Equal(t, njs.parameters.Stream.Name, streamInfo.Config.Name)
+	assert.Equal(t, njs.parameters.Stream.Subjects, streamInfo.Config.Subjects)
+	assert.Equal(t, nats.WorkQueuePolicy, streamInfo.Config.Retention)
+	assert.True(t, streamInfo.Config.AllowRollup)
+	assert.Equal(t, conditionJetstreamTTL, streamInfo.Config.MaxAge)
+
+	assert.Equal(t, njs.parameters.Stream.DuplicateWindow, streamInfo.Config.Duplicates)
+	assert.False(t, streamInfo.Config.NoAck)
+
+	// test update
+	njs.parameters.Stream.Acknowledgements = false
+	njs.parameters.Stream.DuplicateWindow = 5 * time.Minute
+	njs.parameters.Stream.Subjects = []string{"bar.bar"}
+
+	assert.Nil(t, njs.addStream())
+	streamInfo2, err := AsNatsJetStreamContext(njs).StreamInfo(streamName)
+	assert.Nil(t, err)
+
+	assert.Equal(t, 5*time.Minute, streamInfo2.Config.Duplicates)
+	assert.Equal(t, njs.parameters.Stream.Subjects, streamInfo2.Config.Subjects)
+}
