@@ -23,9 +23,8 @@ const (
 	// ConditionStructVersion identifies the condition struct revision
 	ConditionStructVersion string = "1.1"
 
-	// StaleConditionThreshold is the period after which the Condition Orchestrator will
-	// attempt to reconcile the Condition.
-	StaleThreshold = 15 * time.Minute
+	// StaleConditionThreshold is the period after which the Condition Orchestrator will reconcile the Condition.
+	StaleThreshold = 2 * time.Hour
 )
 
 // State is the state value of a Condition
