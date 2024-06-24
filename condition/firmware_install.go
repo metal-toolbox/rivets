@@ -7,7 +7,8 @@ import (
 )
 
 const (
-	FirmwareInstall Kind = "firmwareInstall"
+	FirmwareInstall       Kind = "firmwareInstall"
+	FirmwareInstallInband Kind = "firmwareInstallInband"
 )
 
 // FirmwareTaskParameters are the parameters set for a firmwareInstall condition
@@ -38,6 +39,23 @@ type FirmwareInstallTaskParameters struct {
 
 	// FirmwareSetID specifies the firmware set to be applied.
 	FirmwareSetID uuid.UUID `json:"firmware_set_id,omitempty"`
+}
+
+func (p *FirmwareInstallTaskParameters) MapStringInterfaceToStruct(m map[string]interface{}) error {
+	jsonData, err := json.Marshal(m)
+	if err != nil {
+		return err
+	}
+
+	return json.Unmarshal(jsonData, p)
+}
+
+func (p *FirmwareInstallTaskParameters) Unmarshal(r json.RawMessage) error {
+	return json.Unmarshal(r, p)
+}
+
+func (p *FirmwareInstallTaskParameters) Marshal() (json.RawMessage, error) {
+	return json.Marshal(p)
 }
 
 func (p *FirmwareInstallTaskParameters) MustJSON() []byte {
