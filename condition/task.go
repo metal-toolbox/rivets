@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	rtypes "github.com/metal-toolbox/rivets/types"
 	"github.com/pkg/errors"
 )
 
@@ -54,8 +55,8 @@ type Task[P, D any] struct {
 	// FacilityCode identifies the facility this task is to be executed in.
 	FacilityCode string `json:"facility_code"`
 
-	// Asset holds attributes about the device under firmware install.
-	Asset *Asset `json:"asset,omitempty"`
+	// Server holds attributes about target server this task is for.
+	Server *rtypes.Server `json:"asset,omitempty"`
 
 	// WorkerID is the identifier for the worker executing this task.
 	WorkerID string `json:"worker_id,omitempty"`
@@ -172,7 +173,7 @@ func NewTaskFromCondition(cond *Condition) *Task[any, any] {
 		ID:            cond.ID,
 		Kind:          cond.Kind,
 		State:         Pending,
-		Asset:         &Asset{ID: cond.Target},
+		Server:        &rtypes.Server{ID: cond.Target.String()},
 		Parameters:    cond.Parameters,
 		Data:          json.RawMessage(`{"empty": true}`), // placeholder value
 		Fault:         cond.Fault,
