@@ -367,11 +367,11 @@ func (n *NatsHttpController) fetchCondition(ctx context.Context, serverID uuid.U
 	case http.StatusNotFound:
 		return nil, errors.Wrap(ErrNoCondition, "404, no task found")
 	case http.StatusInternalServerError, http.StatusServiceUnavailable:
-		return nil, errors.Wrap(ErrRetryRequest, fmt.Sprintf("%, message: %s", resp.StatusCode, resp.Message))
+		return nil, errors.Wrap(ErrRetryRequest, fmt.Sprintf("%d, message: %s", resp.StatusCode, resp.Message))
 	case http.StatusBadRequest:
-		return nil, errors.Wrap(ErrRetryRequest, fmt.Sprintf("%, message: %s", resp.StatusCode, resp.Message))
+		return nil, errors.Wrap(ErrRetryRequest, fmt.Sprintf("%d, message: %s", resp.StatusCode, resp.Message))
 	default:
-		return nil, errors.Wrap(errFetchCondition, fmt.Sprintf("unexpected status code %, message: %s", resp.StatusCode, resp.Message))
+		return nil, errors.Wrap(errFetchCondition, fmt.Sprintf("unexpected status code %d, message: %s", resp.StatusCode, resp.Message))
 	}
 }
 
@@ -409,11 +409,11 @@ func (n *NatsHttpController) fetchTask(ctx context.Context, serverID uuid.UUID) 
 	case http.StatusNotFound:
 		return nil, errors.Wrap(errFetchTask, "404, no task found")
 	case http.StatusInternalServerError, http.StatusServiceUnavailable:
-		return nil, errors.Wrap(ErrRetryRequest, fmt.Sprintf("%, message: %s", resp.StatusCode, resp.Message))
+		return nil, errors.Wrap(ErrRetryRequest, fmt.Sprintf("%d, message: %s", resp.StatusCode, resp.Message))
 	case http.StatusBadRequest:
-		return nil, errors.Wrap(errFetchTask, fmt.Sprintf("%, message: %s", resp.StatusCode, resp.Message))
+		return nil, errors.Wrap(errFetchTask, fmt.Sprintf("%d, message: %s", resp.StatusCode, resp.Message))
 	default:
-		return nil, errors.Wrap(errFetchTask, fmt.Sprintf("unexpected status code %, message: %s", resp.StatusCode, resp.Message))
+		return nil, errors.Wrap(errFetchTask, fmt.Sprintf("unexpected status code %d, message: %s", resp.StatusCode, resp.Message))
 	}
 }
 
