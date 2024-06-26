@@ -492,8 +492,8 @@ github.com/mattn/go-sqlite3 v1.14.6/go.mod h1:NyWgC/yNuGj7Q9rpYnZvas74GogHl5/Z4A
 github.com/mattn/go-sqlite3 v1.14.14 h1:qZgc/Rwetq+MtyE18WhzjokPD93dNqLGNT3QJuLvBGw=
 github.com/mattn/go-sqlite3 v1.14.14/go.mod h1:NyWgC/yNuGj7Q9rpYnZvas74GogHl5/Z4A/KQRfk6bU=
 github.com/matttproud/golang_protobuf_extensions v1.0.1/go.mod h1:D8He9yQNgCq6Z5Ld7szi9bcBfOoFv/3dc6xSMkL2PC0=
-github.com/metal-toolbox/fleetdb v0.18.3-0.20240604022458-fec4989755d1 h1:iH5LcESppCwAVJLK8HEpLWyv4bdg39E/8upJhT3x/Wo=
-github.com/metal-toolbox/fleetdb v0.18.3-0.20240604022458-fec4989755d1/go.mod h1:AMmaNB+R6ityOBCBIzfy5Zlc1mGQnqUvpfD+xJScDp0=
+github.com/metal-toolbox/fleetdb v0.18.2 h1:Ya5q2tzF4YcrooFreHUvygIwD+QsvW+A6DQaLL4TrLA=
+github.com/metal-toolbox/fleetdb v0.18.2/go.mod h1:AMmaNB+R6ityOBCBIzfy5Zlc1mGQnqUvpfD+xJScDp0=
 github.com/microsoft/go-mssqldb v0.17.0/go.mod h1:OkoNGhGEs8EZqchVTtochlXruEhEOaO4S0d2sB5aeGQ=
 github.com/miekg/dns v1.1.26/go.mod h1:bPDLeHnStXmXAq1m/Ch/hvfNHr14JKNPMBo3VZKjuso=
 github.com/miekg/dns v1.1.41/go.mod h1:p6aan82bvRIyn+zDIv9xYNUpwa73JcSh9BKwknJysuI=

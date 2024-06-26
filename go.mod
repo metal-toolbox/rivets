@@ -8,7 +8,7 @@ require (
 	github.com/bmc-toolbox/common v0.0.0-20231204194243-7bcbccab7116
 	github.com/google/uuid v1.6.0
 	github.com/hashicorp/go-multierror v1.1.1
-	github.com/metal-toolbox/fleetdb v0.18.3-0.20240604022458-fec4989755d1
+	github.com/metal-toolbox/fleetdb v0.18.2
 	github.com/nats-io/nats-server/v2 v2.10.11
 	github.com/nats-io/nats.go v1.33.1
 	github.com/pkg/errors v0.9.1
