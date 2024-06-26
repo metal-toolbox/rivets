@@ -72,7 +72,7 @@ func TestNewNatsConditionStatusPublisher(t *testing.T) {
 
 	// test happy case
 	publisher, err := NewNatsConditionStatusPublisher(
-		cond.ID.String(),
+		"foo",
 		cond.ID.String(),
 		facilityCode,
 		cond.Kind,
@@ -93,12 +93,12 @@ func TestNewNatsConditionStatusPublisher(t *testing.T) {
 	assert.Equal(t, cond.ID.String(), natsCondStatusPublisher.conditionID)
 	assert.Equal(t, controller.logger, natsCondStatusPublisher.log)
 	assert.Equal(t, controller.conditionKind, cond.Kind)
-	assert.Equal(t, controllerID, natsCondStatusPublisher.controllerID)
+	assert.Equal(t, controllerID.String(), natsCondStatusPublisher.controllerID)
 	assert.Equal(t, controller.logger, natsCondStatusPublisher.log)
+	assert.Equal(t, uint64(0), natsCondStatusPublisher.lastRev)
 
-	// Test re-initialized publisher will set lastRev to KV revision and subsequent publishes work
+	// Test re-initialized publisher will set lastRev to KV revision and subsequently publishes work
 	serverID := uuid.New()
-	controllerID2 := registry.GetID("kvtest2")
 	require.NotPanics(t,
 		func() {
 			errP := publisher.Publish(
@@ -115,11 +115,11 @@ func TestNewNatsConditionStatusPublisher(t *testing.T) {
 	require.Equal(t, uint64(1), natsCondStatusPublisher.lastRev)
 
 	publisher2, err := NewNatsConditionStatusPublisher(
-		cond.ID.String(),
+		"foo",
 		cond.ID.String(),
 		facilityCode,
 		cond.Kind,
-		controllerID2,
+		controllerID,
 		1,
 		evJS,
 		controller.logger,
@@ -148,7 +148,7 @@ func TestNewNatsConditionStatusPublisher(t *testing.T) {
 	require.Equal(t, uint64(2), natsConStatusPublisher.lastRev)
 }
 
-func TestPublish(t *testing.T) {
+func TestNatsConditionStatusPublisher_Publish(t *testing.T) {
 	srv := startJetStreamServer(t)
 	defer shutdownJetStream(t, srv)
 	natsConn, jsCtx := jetStreamContext(t, srv) // nc is closed on evJS.Close(), js needs no cleanup
