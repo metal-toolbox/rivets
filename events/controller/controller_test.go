@@ -16,7 +16,6 @@ import (
 
 	"github.com/metal-toolbox/rivets/condition"
 	"github.com/metal-toolbox/rivets/events"
-	"github.com/metal-toolbox/rivets/events/registry"
 )
 
 func TestNewNatsControllerWithOptions(t *testing.T) {
@@ -168,7 +167,7 @@ func TestProcessCondition(t *testing.T) {
 
 			var cStatusPublisher *MockConditionStatusPublisher
 
-			handler := NewMockConditionHandler(t)
+			handler := NewMockTaskHandler(t)
 			// expect handler, completions for orphaned and notStarted conditions
 			if tt.state == orphaned || tt.state == notStarted {
 				eStatusAcknowledger.On("complete").Return()
@@ -195,11 +194,11 @@ func TestProcessCondition(t *testing.T) {
 			l.Level = 0 // set higher value to debug
 			n := &NatsController{
 				logger:                  l,
-				controllerID:            registry.GetID("mock"),
-				conditionHandlerFactory: func() ConditionHandler { return handler },
+				conditionHandlerFactory: func() TaskHandler { return handler },
+				conditionStatusQueryor:  cStatusQueryor,
 			}
 
-			n.processCondition(context.Background(), cond, eStatusAcknowledger, cStatusQueryor, cStatusPublisher)
+			n.processCondition(context.Background(), cond, eStatusAcknowledger)
 
 			eStatusAcknowledger.AssertCalled(t, tt.expectMethod)
 			cStatusQueryor.AssertExpectations(t)
@@ -285,16 +284,16 @@ func TestRunConditionHandlerWithMonitor(t *testing.T) {
 
 	testcases := []struct {
 		name            string
-		mocksetup       func() (*MockConditionHandler, *events.MockMessage, *MockConditionStatusPublisher)
+		mocksetup       func() (*MockTaskHandler, *events.MockMessage, *MockConditionStatusPublisher)
 		publishInterval time.Duration
 		wantErr         bool
 	}{
 		{
 			name: "handler executed successfully",
-			mocksetup: func() (*MockConditionHandler, *events.MockMessage, *MockConditionStatusPublisher) {
+			mocksetup: func() (*MockTaskHandler, *events.MockMessage, *MockConditionStatusPublisher) {
 				publisher := NewMockConditionStatusPublisher(t)
 				message := events.NewMockMessage(t)
-				handler := NewMockConditionHandler(t)
+				handler := NewMockTaskHandler(t)
 
 				handler.On("Handle", mock.Anything, cond, publisher).Times(1).
 					//  sleep for 100ms
@@ -311,10 +310,10 @@ func TestRunConditionHandlerWithMonitor(t *testing.T) {
 		},
 		{
 			name: "handler returns error",
-			mocksetup: func() (*MockConditionHandler, *events.MockMessage, *MockConditionStatusPublisher) {
+			mocksetup: func() (*MockTaskHandler, *events.MockMessage, *MockConditionStatusPublisher) {
 				publisher := NewMockConditionStatusPublisher(t)
 				message := events.NewMockMessage(t)
-				handler := NewMockConditionHandler(t)
+				handler := NewMockTaskHandler(t)
 
 				handler.On("Handle", mock.Anything, cond, publisher).Times(1).
 					Return(errors.New("barf"))
@@ -329,10 +328,10 @@ func TestRunConditionHandlerWithMonitor(t *testing.T) {
 		},
 		{
 			name: "status publish fails",
-			mocksetup: func() (*MockConditionHandler, *events.MockMessage, *MockConditionStatusPublisher) {
+			mocksetup: func() (*MockTaskHandler, *events.MockMessage, *MockConditionStatusPublisher) {
 				publisher := NewMockConditionStatusPublisher(t)
 				message := events.NewMockMessage(t)
-				handler := NewMockConditionHandler(t)
+				handler := NewMockTaskHandler(t)
 
 				message.On("Nak").Return(nil)
 				publisher.On("Publish", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(errors.New("barf"))
@@ -344,10 +343,10 @@ func TestRunConditionHandlerWithMonitor(t *testing.T) {
 		},
 		{
 			name: "handler panic",
-			mocksetup: func() (*MockConditionHandler, *events.MockMessage, *MockConditionStatusPublisher) {
+			mocksetup: func() (*MockTaskHandler, *events.MockMessage, *MockConditionStatusPublisher) {
 				publisher := NewMockConditionStatusPublisher(t)
 				message := events.NewMockMessage(t)
-				handler := NewMockConditionHandler(t)
+				handler := NewMockTaskHandler(t)
 
 				handler.On("Handle", mock.Anything, cond, publisher).Times(1).
 					Run(func(_ mock.Arguments) { panic("oops") })
@@ -370,7 +369,7 @@ func TestRunConditionHandlerWithMonitor(t *testing.T) {
 			l.Level = 0 // set higher value to debug
 			n := &NatsController{
 				logger: l,
-				conditionHandlerFactory: func() ConditionHandler {
+				conditionHandlerFactory: func() TaskHandler {
 					return handler
 				},
 			}
@@ -379,7 +378,6 @@ func TestRunConditionHandlerWithMonitor(t *testing.T) {
 				ctx,
 				cond,
 				n.newNatsEventStatusAcknowleger(message),
-				publisher,
 				tt.publishInterval,
 			)
 

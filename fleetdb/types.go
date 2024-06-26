@@ -3,6 +3,7 @@ package fleetdb
 import (
 	"github.com/bmc-toolbox/common"
 	"github.com/google/uuid"
+	rt "github.com/metal-toolbox/rivets/types"
 )
 
 // FirmwareVersionedAttribute holds component firmware information.
@@ -14,20 +15,9 @@ type FirmwareVersionedAttribute struct {
 
 // StatusVersionedAttribute holds component status information.
 type StatusVersionedAttribute struct {
-	Status        *common.Status `json:"status,omitempty"`
-	NICPortStatus *NICPortStatus `json:"nic_port_status,omitempty"`
-	SmartStatus   string         `json:"smart_status,omitempty"`
-}
-
-// NICPortStatus holds the NIC port status which includes the health status and link status information.
-type NICPortStatus struct {
-	*common.Status
-	ID                   string `json:"id,omitempty"`
-	MacAddress           string `json:"macaddress,omitempty"`
-	ActiveLinkTechnology string `json:"active_link_technology,omitempty"`
-	LinkStatus           string `json:"link_status,omitempty"`
-	MTUSize              int    `json:"mtu_size,omitempty"`
-	AutoSpeedNegotiation bool   `json:"autospeednegotiation,omitempty"`
+	Status        *common.Status    `json:"status,omitempty"`
+	NICPortStatus *rt.NICPortStatus `json:"nic_port_status,omitempty"`
+	SmartStatus   string            `json:"smart_status,omitempty"`
 }
 
 type MetadataAttribute struct {

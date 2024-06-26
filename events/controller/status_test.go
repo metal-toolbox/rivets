@@ -3,7 +3,6 @@ package controller
 import (
 	"context"
 	"encoding/json"
-	"os"
 	"testing"
 	"time"
 
@@ -26,6 +25,7 @@ func startJetStreamServer(t *testing.T) *server.Server {
 	opts := srvtest.DefaultTestOptions
 	opts.Port = -1
 	opts.JetStream = true
+	opts.StoreDir = t.TempDir()
 	return srvtest.RunServer(&opts)
 }
 
@@ -44,16 +44,7 @@ func jetStreamContext(t *testing.T, s *server.Server) (*nats.Conn, nats.JetStrea
 
 func shutdownJetStream(t *testing.T, s *server.Server) {
 	t.Helper()
-	var sd string
-	if config := s.JetStreamConfig(); config != nil {
-		sd = config.StoreDir
-	}
 	s.Shutdown()
-	if sd != "" {
-		if err := os.RemoveAll(sd); err != nil {
-			t.Fatalf("Unable to remove storage %q: %v", sd, err)
-		}
-	}
 	s.WaitForShutdown()
 }
 
@@ -70,48 +61,91 @@ func TestNewNatsConditionStatusPublisher(t *testing.T) {
 	}
 
 	const facilityCode = "fac13"
+	controllerID := registry.GetID("kvtest")
 
 	controller := &NatsController{
 		stream:        evJS,
 		facilityCode:  facilityCode,
-		controllerID:  registry.GetID("kvtest"),
 		conditionKind: cond.Kind,
 		logger:        logrus.New(),
 	}
 
 	// test happy case
-	publisher, err := controller.NewNatsConditionStatusPublisher(cond.ID.String())
+	publisher, err := NewNatsConditionStatusPublisher(
+		cond.ID.String(),
+		cond.ID.String(),
+		facilityCode,
+		cond.Kind,
+		controllerID,
+		1,
+		evJS,
+		controller.logger,
+	)
 	require.Nil(t, err)
 	require.NotNil(t, publisher, "publisher constructor")
 
-	assert.Equal(t, controller.facilityCode, publisher.facilityCode)
-	assert.Equal(t, cond.ID.String(), publisher.conditionID)
-	assert.Equal(t, controller.logger, publisher.log)
+	// assert to type to validate attributes
+	natsCondStatusPublisher, ok := publisher.(*NatsConditionStatusPublisher)
+	assert.True(t, ok)
+	assert.NotNil(t, natsCondStatusPublisher)
+
+	assert.Equal(t, controller.facilityCode, natsCondStatusPublisher.facilityCode)
+	assert.Equal(t, cond.ID.String(), natsCondStatusPublisher.conditionID)
+	assert.Equal(t, controller.logger, natsCondStatusPublisher.log)
+	assert.Equal(t, controller.conditionKind, cond.Kind)
+	assert.Equal(t, controllerID, natsCondStatusPublisher.controllerID)
+	assert.Equal(t, controller.logger, natsCondStatusPublisher.log)
 
 	// Test re-initialized publisher will set lastRev to KV revision and subsequent publishes work
 	serverID := uuid.New()
+	controllerID2 := registry.GetID("kvtest2")
 	require.NotPanics(t,
 		func() {
-			errP := publisher.Publish(context.Background(), serverID.String(), condition.Pending, []byte(`{"pending...": "true"}`))
+			errP := publisher.Publish(
+				context.Background(),
+				serverID.String(),
+				condition.Pending,
+				[]byte(`{"pending...": "true"}`),
+				false,
+			)
 			require.NoError(t, errP)
 		},
 		"publish 1",
 	)
-	require.Equal(t, uint64(1), publisher.lastRev)
+	require.Equal(t, uint64(1), natsCondStatusPublisher.lastRev)
 
-	publisher, err = controller.NewNatsConditionStatusPublisher(cond.ID.String())
+	publisher2, err := NewNatsConditionStatusPublisher(
+		cond.ID.String(),
+		cond.ID.String(),
+		facilityCode,
+		cond.Kind,
+		controllerID2,
+		1,
+		evJS,
+		controller.logger,
+	)
+	natsConStatusPublisher, ok := publisher2.(*NatsConditionStatusPublisher)
+	assert.True(t, ok)
+	assert.NotNil(t, natsConStatusPublisher)
+
 	require.Nil(t, err)
-	require.NotNil(t, publisher, "publisher constructor")
-	require.Equal(t, uint64(1), publisher.lastRev)
+	require.NotNil(t, publisher2, "publisher constructor")
+	require.Equal(t, uint64(1), natsConStatusPublisher.lastRev)
 
 	require.NotPanics(t,
 		func() {
-			errP := publisher.Publish(context.Background(), serverID.String(), condition.Active, []byte(`{"some work...": "true"}`))
+			errP := publisher2.Publish(
+				context.Background(),
+				serverID.String(),
+				condition.Active,
+				[]byte(`{"some work...": "true"}`),
+				false,
+			)
 			require.NoError(t, errP)
 		},
 		"publish 2",
 	)
-	require.Equal(t, uint64(2), publisher.lastRev)
+	require.Equal(t, uint64(2), natsConStatusPublisher.lastRev)
 }
 
 func TestPublish(t *testing.T) {
@@ -127,18 +161,29 @@ func TestPublish(t *testing.T) {
 	}
 
 	const facilityCode = "fac13"
+	controllerID := registry.GetID("kvtest")
 
 	controller := &NatsController{
 		stream:        evJS,
 		facilityCode:  facilityCode,
-		controllerID:  registry.GetID("kvtest"),
 		conditionKind: cond.Kind,
 		logger:        logrus.New(),
 	}
 
-	publisher, err := controller.NewNatsConditionStatusPublisher(cond.ID.String())
+	publisher, err := NewNatsConditionStatusPublisher(
+		cond.ID.String(),
+		cond.ID.String(),
+		facilityCode,
+		cond.Kind,
+		controllerID,
+		1,
+		evJS,
+		controller.logger,
+	)
 	require.Nil(t, err)
-	require.NotNil(t, publisher, "publisher constructor")
+	natsCondStatusPublisher, ok := publisher.(*NatsConditionStatusPublisher)
+	assert.True(t, ok)
+	assert.NotNil(t, natsCondStatusPublisher)
 
 	kv, err := jsCtx.KeyValue(string(cond.Kind))
 	require.NoError(t, err, "kv read handle")
@@ -148,16 +193,22 @@ func TestPublish(t *testing.T) {
 	// publish pending status
 	require.NotPanics(t,
 		func() {
-			errP := publisher.Publish(context.Background(), serverID.String(), condition.Pending, []byte(`{"pending...": "true"}`))
+			errP := publisher.Publish(
+				context.Background(),
+				serverID.String(),
+				condition.Pending,
+				[]byte(`{"pending...": "true"}`),
+				false,
+			)
 			require.NoError(t, errP)
 		},
 		"publish pending",
 	)
-	require.NotEqual(t, 0, publisher.lastRev, "last rev - 1")
+	require.NotEqual(t, 0, natsCondStatusPublisher.lastRev, "last rev - 1")
 
 	entry, err := kv.Get(facilityCode + "." + cond.ID.String())
 	require.Nil(t, err)
-	require.Equal(t, entry.Revision(), publisher.lastRev, "last rev - 2")
+	require.Equal(t, entry.Revision(), natsCondStatusPublisher.lastRev, "last rev - 2")
 
 	sv := &condition.StatusValue{}
 	err = json.Unmarshal(entry.Value(), sv)
@@ -170,7 +221,13 @@ func TestPublish(t *testing.T) {
 	// publish active status
 	require.NotPanics(t,
 		func() {
-			errP := publisher.Publish(context.Background(), serverID.String(), condition.Active, []byte(`{"active...": "true"}`))
+			errP := publisher.Publish(
+				context.Background(),
+				serverID.String(),
+				condition.Active,
+				[]byte(`{"active...": "true"}`),
+				false,
+			)
 			require.NoError(t, errP)
 
 		},
@@ -179,7 +236,7 @@ func TestPublish(t *testing.T) {
 
 	entry, err = kv.Get(facilityCode + "." + cond.ID.String())
 	require.Nil(t, err)
-	require.Equal(t, entry.Revision(), publisher.lastRev, "last rev - 3")
+	require.Equal(t, entry.Revision(), natsCondStatusPublisher.lastRev, "last rev - 3")
 }
 
 func TestConditionState(t *testing.T) {

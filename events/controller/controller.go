@@ -11,7 +11,6 @@ import (
 
 	"github.com/metal-toolbox/rivets/condition"
 	"github.com/metal-toolbox/rivets/events"
-	"github.com/metal-toolbox/rivets/events/registry"
 	"github.com/nats-io/nats.go"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -20,7 +19,7 @@ import (
 )
 
 const (
-	pkgName = "events/natscontroller"
+	pkgNameNatsController = "events/natscontroller"
 	// Default connection timeout
 	connectionTimeout = 1 * time.Minute
 	// Default timeout for the condition handler, after which its canceled
@@ -49,7 +48,6 @@ var (
 )
 
 type NatsController struct {
-	controllerID      registry.ControllerID
 	stream            events.Stream
 	syncWG            *sync.WaitGroup
 	logger            *logrus.Logger
@@ -65,8 +63,11 @@ type NatsController struct {
 	// Factory method returns a condition event handler
 	// set by the caller when calling ListenEvents()
 	conditionHandlerFactory ConditionHandlerFactory
-	concurrency             int
-	dispatched              int32
+	// Queryor provides methods to query the Condition State, StatusValue's
+	conditionStatusQueryor ConditionStatusQueryor
+	liveness               LivenessCheckin
+	concurrency            int
+	dispatched             int32
 }
 
 // Option sets parameters on the NatsController
@@ -143,7 +144,7 @@ func WithConnectionTimeout(t time.Duration) Option {
 }
 
 func (n *NatsController) ID() string {
-	return n.controllerID.String()
+	return n.liveness.ControllerID().String()
 }
 
 func (n *NatsController) FacilityCode() string {
@@ -152,7 +153,7 @@ func (n *NatsController) FacilityCode() string {
 
 // Connect to NATS Jetstream and register as a controller.
 func (n *NatsController) Connect(ctx context.Context) error {
-	ctx, span := otel.Tracer(pkgName).Start(
+	ctx, span := otel.Tracer(pkgNameNatsController).Start(
 		ctx,
 		"Connect",
 	)
@@ -179,7 +180,10 @@ func (n *NatsController) Connect(ctx context.Context) error {
 		return errors.Wrap(errStreamSub, err.Error())
 	}
 
-	n.startLivenessCheckin(ctx)
+	// initialize NATS liveness checkin
+	n.liveness = NewNatsLiveness(n.natsConfig, n.stream, n.logger, n.hostname, checkinInterval)
+	n.liveness.StartLivenessCheckin(ctx)
+
 	n.logger.WithFields(
 		logrus.Fields{
 			"hostname":      n.hostname,
@@ -194,12 +198,17 @@ func (n *NatsController) Connect(ctx context.Context) error {
 	return nil
 }
 
-// ConditionHandler is passed in by the caller to be invoked when the expected event is received
-type ConditionHandler interface {
-	Handle(ctx context.Context, condition *condition.Condition, publisher ConditionStatusPublisher) error
+// TaskHandler is passed in by the caller to be invoked when the expected event is received
+//
+// Note: the TaskHandler interface is to be deprecated by the TaskHandler interface (as seen in controller_http.go)
+// where the Condition is converted to a condition.Task object before being passed into
+// the Handler.
+// The TaskHandler interface is to replace the TaskHandler interface
+type TaskHandler interface {
+	HandleTask(ctx context.Context, task *condition.Task[any, any], statusPublisher Publisher) error
 }
 
-type ConditionHandlerFactory func() ConditionHandler
+type ConditionHandlerFactory func() TaskHandler
 
 // Handle events accepts a callback function to run when an event is fetched from the NATS JS.
 //
@@ -207,7 +216,7 @@ type ConditionHandlerFactory func() ConditionHandler
 // - When the callback function returns no error, the event is marked as completed.
 // - When the callback function returns an ErrRetryHandler error, the corresponding event is placed back on the queue to be retried.
 func (n *NatsController) ListenEvents(ctx context.Context, chf ConditionHandlerFactory) error {
-	ctx, span := otel.Tracer(pkgName).Start(
+	ctx, span := otel.Tracer(pkgNameNatsController).Start(
 		ctx,
 		"ListenEvents",
 	)
@@ -306,7 +315,7 @@ func (n *NatsController) processEvents(ctx context.Context) error {
 
 func (n *NatsController) processConditionFromEvent(ctx context.Context, msg events.Message, eventAcknowleger eventStatusAcknowleger, conditionStatusQueryor ConditionStatusQueryor) {
 	defer n.syncWG.Done()
-	ctx, span := otel.Tracer(pkgName).Start(
+	ctx, _ = otel.Tracer(pkgNameNatsController).Start(
 		ctx,
 		"processConditionFromEvent",
 	)
@@ -327,16 +336,8 @@ func (n *NatsController) processConditionFromEvent(ctx context.Context, msg even
 
 	// extract parent trace context from the event if any.
 	ctx = msg.ExtractOtelTraceContext(ctx)
-
-	conditionStatusPublisher, err := n.NewNatsConditionStatusPublisher(cond.ID.String())
-	if err != nil {
-		n.logger.WithField("conditionID", cond.ID.String()).Warn("failed to initialize publisher")
-		eventAcknowleger.nak()
-		spanEvent(span, cond, n.controllerID.String(), "sent nack, failed to initialize publisher: "+err.Error())
-		return
-	}
-
-	n.processCondition(ctx, cond, eventAcknowleger, conditionStatusQueryor, conditionStatusPublisher)
+	n.conditionStatusQueryor = conditionStatusQueryor
+	n.processCondition(ctx, cond, eventAcknowleger)
 }
 
 func conditionFromEvent(e events.Message) (*condition.Condition, error) {
@@ -359,10 +360,8 @@ func (n *NatsController) processCondition(
 	ctx context.Context,
 	cond *condition.Condition,
 	eventAcknowleger eventStatusAcknowleger, // the NATS JS event status ack interface
-	conditionStatusQueryor ConditionStatusQueryor, // the condition status query interface
-	conditionStatusPublisher ConditionStatusPublisher, // the condition status publish interface
 ) {
-	ctx, span := otel.Tracer(pkgName).Start(
+	ctx, span := otel.Tracer(pkgNameNatsController).Start(
 		ctx,
 		"processCondition",
 	)
@@ -379,39 +378,39 @@ func (n *NatsController) processCondition(
 	)
 
 	// check and see if the condition is or has-been handled by another controller
-	currentState := conditionStatusQueryor.ConditionState(cond.ID.String())
+	currentState := n.conditionStatusQueryor.ConditionState(cond.ID.String())
 	switch currentState {
 	case inProgress:
 		n.logger.WithField("conditionID", cond.ID.String()).Info("condition is already in progress")
 		eventAcknowleger.inProgress()
-		spanEvent(span, cond, n.controllerID.String(), "ackInProgress")
+		spanEvent(span, cond, n.ID(), "ackInProgress")
 
 		return
 
 	case complete:
 		n.logger.WithField("conditionID", cond.ID.String()).Info("condition is complete")
 		eventAcknowleger.complete()
-		spanEvent(span, cond, n.controllerID.String(), "ackComplete")
+		spanEvent(span, cond, n.ID(), "ackComplete")
 
 		return
 
 	case orphaned:
 		n.logger.WithField("conditionID", cond.ID.String()).Warn("restarting this condition")
 		eventAcknowleger.inProgress()
-		spanEvent(span, cond, n.controllerID.String(), "restarting condition")
+		spanEvent(span, cond, n.ID(), "restarting condition")
 
 	// we need to restart this event
 	case notStarted:
 		n.logger.WithField("conditionID", cond.ID.String()).Info("starting new condition")
 		eventAcknowleger.inProgress()
-		spanEvent(span, cond, n.controllerID.String(), "start new condition")
+		spanEvent(span, cond, n.ID(), "start new condition")
 
 	// break out here, this is a new event
 	case indeterminate:
 		n.logger.WithField("conditionID", cond.ID.String()).Warn("unable to determine state of this condition")
 		// send it back to NATS to try again
 		eventAcknowleger.nak()
-		spanEvent(span, cond, n.controllerID.String(), "sent nack, indeterminate state")
+		spanEvent(span, cond, n.ID(), "sent nack, indeterminate state")
 
 		return
 	}
@@ -419,7 +418,7 @@ func (n *NatsController) processCondition(
 	handlerCtx, cancel := context.WithTimeout(ctx, n.handlerTimeout)
 	defer cancel()
 
-	errHandler := n.runConditionHandlerWithMonitor(handlerCtx, cond, eventAcknowleger, conditionStatusPublisher, statusInterval)
+	errHandler := n.runConditionHandlerWithMonitor(handlerCtx, cond, eventAcknowleger, statusInterval)
 	if errHandler != nil {
 		registerConditionRuntimeMetric(startTS, string(condition.Failed))
 
@@ -428,15 +427,15 @@ func (n *NatsController) processCondition(
 			n.logger.WithError(errHandler).Warn("condition handler returned retry error")
 
 			// TODO: write this condition back onto the Jetstream so its retried
-			return
 		}
 
+		// TODO: consider publishing a failed status value here
 		// other errors are logged
 		n.logger.WithError(errHandler).Error("condition handler returned error")
 		spanEvent(
 			span,
 			cond,
-			n.controllerID.String(),
+			n.ID(),
 			"condition handler returned error: "+errHandler.Error(),
 		)
 	}
@@ -446,38 +445,71 @@ func (n *NatsController) processCondition(
 	spanEvent(
 		span,
 		cond,
-		n.controllerID.String(),
+		n.ID(),
 		"condition complete",
 	)
 }
 
-func (n *NatsController) runConditionHandlerWithMonitor(ctx context.Context, cond *condition.Condition, eventStatusSet eventStatusAcknowleger, conditionStatusPublisher ConditionStatusPublisher, statusInterval time.Duration) (err error) {
-	ctx, span := otel.Tracer(pkgName).Start(
+func (n *NatsController) runConditionHandlerWithMonitor(ctx context.Context, cond *condition.Condition, eventStatusSet eventStatusAcknowleger, statusInterval time.Duration) (err error) {
+	ctx, span := otel.Tracer(pkgNameNatsController).Start(
 		ctx,
 		"runConditionHandlerWithMonitor",
 	)
 	defer span.End()
 
-	// create first record of condition in controller KV
-	//
-	// failure to publish the first status KV record is fatal
-	status := condition.NewTaskStatusRecord("In process by controller: " + n.hostname)
-	cond.Status = status.MustMarshal()
-	if err = conditionStatusPublisher.Publish(
-		ctx,
-		cond.Target.String(),
-		condition.Pending,
-		cond.Status,
-	); err != nil {
-		n.logger.WithError(err).WithFields(logrus.Fields{
+	// msg nak helper
+	nakFail := func(info string, failErr error) error {
+		n.logger.WithError(failErr).WithFields(logrus.Fields{
 			"condition.id": cond.ID.String(),
-		}).Warn("error publishing first KV status record, condition aborted")
+		}).Warn(info)
 
 		// send this message back on the bus to be redelivered, or atleast attempt to.
 		eventStatusSet.nak()
 		metricsEventsCounter(true, "nack")
 
 		return err
+	}
+
+	publisher, err := NewNatsPublisher(
+		n.natsConfig.AppName,
+		cond.ID.String(),
+		cond.Target.String(),
+		n.facilityCode,
+		n.conditionKind,
+		n.liveness.ControllerID(),
+		n.natsConfig.KVReplicationFactor,
+		n.stream.(*events.NatsJetstream),
+		n.logger,
+	)
+	if err != nil {
+		return nakFail("failed to initialize publisher", err)
+	}
+
+	// create first record of condition in controller KV
+	//
+	// failure to publish the first status KV record is fatal
+	task := condition.NewTaskFromCondition(cond)
+	task.Status = condition.NewTaskStatusRecord("In process by controller: " + n.hostname)
+
+	if err = publisher.Publish(ctx, task, false); err != nil {
+		info := "error publishing first KV status record, condition aborted"
+		return nakFail(info, err)
+	}
+
+	publish := func(state condition.State, status string) {
+
+		// append to existing status record, unless it was overwritten by the controller somehow
+		task.Status.Append(status)
+		task.State = state
+
+		// publish failed state, status
+		if err := publisher.Publish(
+			ctx,
+			task,
+			false,
+		); err != nil {
+			n.logger.WithError(err).Error("failed to publish final status")
+		}
 	}
 
 	// mark message as complete as the status KV record is in place
@@ -497,7 +529,8 @@ func (n *NatsController) runConditionHandlerWithMonitor(ctx context.Context, con
 		for {
 			select {
 			case <-ticker.C:
-				conditionStatusPublisher.UpdateTimestamp(ctx)
+				// only timestamp update
+				publisher.Publish(ctx, task, true)
 			case <-doneCh:
 				break Loop
 			}
@@ -515,29 +548,21 @@ func (n *NatsController) runConditionHandlerWithMonitor(ctx context.Context, con
 			n.logger.Printf("!!panic %s: %s", rec, debug.Stack())
 			n.logger.Error(err)
 
-			// append to existing status record, unless it was overwritten by the controller somehow
-			statusRecord, errSR := condition.StatusRecordFromMessage(cond.Status)
-			if errSR != nil {
-				n.logger.WithError(errSR).WithFields(logrus.Fields{
-					"condition.id": cond.ID.String(),
-				}).Warn("error parsing existing status record from condition")
-			} else {
-				statusRecord.Append("Fatal error running Condition, check logs for details")
-			}
-
-			// publish failed state, status
-			//
-			// Publish logs error internally
-			_ = conditionStatusPublisher.Publish(
-				ctx,
-				cond.Target.String(),
-				condition.Failed,
-				statusRecord.MustMarshal(),
-			)
+			publish(condition.Failed, "Fatal error running Condition, check logs for details")
 		}
 	}() // nolint:errcheck // nope
 
-	return n.conditionHandlerFactory().Handle(ctx, cond, conditionStatusPublisher)
+	if err := n.conditionHandlerFactory().HandleTask(ctx, task, publisher); err != nil {
+		publish(condition.Failed, "failed with error: "+err.Error())
+		return err
+	}
+
+	// TODO:
+	// If the handler has returned and not updated the Task.State, StatusValue.State
+	// into a final state, then set those fields to failed.
+	n.logger.Info("Controller completed task")
+
+	return nil
 }
 
 func (n *NatsController) concurrencyLimit() bool {

@@ -10,6 +10,7 @@ package registry
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/nats-io/nats.go"
@@ -37,6 +38,17 @@ func InitializeActiveControllerRegistry(njs *events.NatsJetstream) error {
 		kv.WithDescription(kvDescription),
 		kv.WithTTL(registryTTL),
 	)
+}
+
+// SetHandle is a helper method which assigns the nats.KeyValue to the pkg global registry
+func SetHandle(handle nats.KeyValue) error {
+	if registry != nil {
+		return ErrRegistryPreviouslyInitialized
+	}
+
+	registry = handle
+
+	return nil
 }
 
 // XXX: You probably don't want the un-opinionated one, but it's here.
@@ -79,7 +91,22 @@ func ControllerCheckin(id ControllerID) error {
 	if err != nil {
 		return err
 	}
-	rev, err := registry.Update(id.String(), active, id.version())
+
+	// The controller current revision does not match the existing
+	// TODO: im not sure how this occured but this works around the case
+	// where a controller check in is refused because the revision doesn't match.
+	curr, err := registry.Get(id.String())
+	if err != nil {
+		return err
+	}
+
+	var currRev uint64
+	if curr.Revision() != id.version() {
+		fmt.Printf("revisions did not match KV=%d != recorded=%d\n", curr.Revision(), id.version())
+		currRev = curr.Revision()
+	}
+
+	rev, err := registry.Update(id.String(), active, currRev)
 	if err == nil {
 		id.updateVersion(rev)
 	}

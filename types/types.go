@@ -1,6 +1,7 @@
 package types
 
 import (
+	"strings"
 	"time"
 
 	"github.com/bmc-toolbox/common"
@@ -8,15 +9,63 @@ import (
 
 // Component is a generic server component type
 type Component struct {
-	ID         string               `json:"id,omitempty"`
-	UpdatedAt  time.Time            `json:"updated,omitempty"`
-	Firmware   *common.Firmware     `json:"firmware,omitempty"`
-	Status     *common.Status       `json:"status,omitempty"`
-	Attributes *ComponentAttributes `json:"attributes,omitempty"`
-	Name       string               `json:"name,omitempty"`
-	Vendor     string               `json:"vendor,omitempty"`
-	Model      string               `json:"model,omitempty"`
-	Serial     string               `json:"serial,omitempty"`
+	ID            string               `json:"id,omitempty"`
+	UpdatedAt     time.Time            `json:"updated,omitempty"`
+	Firmware      *common.Firmware     `json:"firmware,omitempty"`
+	Status        *common.Status       `json:"status,omitempty"`
+	NICPortStatus []*NICPortStatus     `json:"nic_port_status,omitempty"`
+	Attributes    *ComponentAttributes `json:"attributes,omitempty"`
+	SmartStatus   string               `json:"smart_status,omitempty"`
+	Name          string               `json:"name,omitempty"`
+	Vendor        string               `json:"vendor,omitempty"`
+	Model         string               `json:"model,omitempty"`
+	Serial        string               `json:"serial,omitempty"`
+}
+
+// Components is a slice of Component on which one or more methods may be available.
+type Components []*Component
+
+// BySlug returns a component that matches the slug value.
+func (c Components) BySlugModel(cSlug string, cModels []string) []*Component {
+	// identify components that match the slug
+	slugsMatch := []*Component{}
+	for _, component := range c {
+		component := component
+		// skip non matching component slug
+		if !strings.EqualFold(cSlug, component.Name) {
+			continue
+		}
+
+		// since theres a single BIOS, BMC (:fingers_crossed) component on a machine
+		// we look no further and return the found component
+		if strings.EqualFold(common.SlugBIOS, cSlug) || strings.EqualFold(common.SlugBMC, cSlug) {
+			return []*Component{component}
+		}
+
+		slugsMatch = append(slugsMatch, component)
+	}
+
+	// none found
+	if len(slugsMatch) == 0 {
+		return nil
+	}
+
+	components := []*Component{}
+	// multiple components identified, match component by model
+	for _, find := range cModels {
+		for _, component := range slugsMatch {
+			find = strings.ToLower(strings.TrimSpace(find))
+			if strings.Contains(strings.ToLower(component.Model), find) {
+				components = append(components, component)
+			}
+		}
+	}
+
+	if len(components) == 0 {
+		return nil
+	}
+
+	return components
 }
 
 // Server is a generic server  type
@@ -74,4 +123,15 @@ type ComponentAttributes struct {
 	CapableSpeedGbps             int64                `json:"capable_speed_gbps,omitempty"`
 	NegotiatedSpeedGbps          int64                `json:"negotiated_speed_gbps,omitempty"`
 	Oem                          bool                 `json:"oem,omitempty"`
+}
+
+// NICPortStatus holds the NIC port status which includes the health status and link status information.
+type NICPortStatus struct {
+	*common.Status
+	ID                   string `json:"id,omitempty"`
+	MacAddress           string `json:"macaddress,omitempty"`
+	ActiveLinkTechnology string `json:"active_link_technology,omitempty"`
+	LinkStatus           string `json:"link_status,omitempty"`
+	MTUSize              int    `json:"mtu_size,omitempty"`
+	AutoSpeedNegotiation bool   `json:"autospeednegotiation,omitempty"`
 }

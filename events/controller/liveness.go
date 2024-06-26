@@ -5,9 +5,13 @@ import (
 	"sync"
 	"time"
 
+	"github.com/google/uuid"
+	co "github.com/metal-toolbox/conditionorc/pkg/api/v1/client"
+	"github.com/metal-toolbox/rivets/condition"
 	"github.com/metal-toolbox/rivets/events"
 	"github.com/metal-toolbox/rivets/events/pkg/kv"
 	"github.com/metal-toolbox/rivets/events/registry"
+	"github.com/sirupsen/logrus"
 
 	"github.com/nats-io/nats.go"
 	"github.com/pkg/errors"
@@ -16,10 +20,28 @@ import (
 var (
 	once sync.Once
 
-	checkinLivenessTTL = 3 * time.Minute
+	// !!NOTE!! NATS: make sure to update NATS KV config for the new threshold
+	checkinLivenessTTL = condition.StaleThreshold
 )
 
-func (n *NatsController) checkinKVOpts() []kv.Option {
+type LivenessCheckin interface {
+	StartLivenessCheckin(ctx context.Context)
+	ControllerID() registry.ControllerID
+}
+
+// NatsLiveness provides methods to register and periodically check into the controller registry.
+//
+// It implements the LivenessCheckin interface
+type NatsLiveness struct {
+	logger       *logrus.Logger
+	stream       events.Stream
+	natsConfig   events.NatsOptions
+	controllerID registry.ControllerID
+	interval     time.Duration
+	hostname     string
+}
+
+func (n *NatsLiveness) checkinKVOpts() []kv.Option {
 	opts := []kv.Option{
 		kv.WithTTL(checkinLivenessTTL),
 		kv.WithReplicas(n.natsConfig.KVReplicationFactor),
@@ -28,8 +50,30 @@ func (n *NatsController) checkinKVOpts() []kv.Option {
 	return opts
 }
 
+// NewNatsLiveness returns a NATS implementation of the LivenessCheckin interface
+func NewNatsLiveness(
+	cfg events.NatsOptions,
+	stream events.Stream,
+	l *logrus.Logger,
+	hostname string,
+	interval time.Duration,
+) LivenessCheckin {
+	return &NatsLiveness{
+		logger:     l,
+		stream:     stream,
+		natsConfig: cfg,
+		hostname:   hostname,
+		interval:   interval,
+	}
+}
+
+// Returns the controller ID for this instance
+func (n *NatsLiveness) ControllerID() registry.ControllerID {
+	return n.controllerID
+}
+
 // This starts a go-routine to peridically check in with the NATS kv
-func (n *NatsController) startLivenessCheckin(ctx context.Context) {
+func (n *NatsLiveness) StartLivenessCheckin(ctx context.Context) {
 	once.Do(func() {
 		n.controllerID = registry.GetID(n.hostname)
 
@@ -43,12 +87,12 @@ func (n *NatsController) startLivenessCheckin(ctx context.Context) {
 	})
 }
 
-func (n *NatsController) checkinRoutine(ctx context.Context) {
+func (n *NatsLiveness) checkinRoutine(ctx context.Context) {
 	if err := registry.RegisterController(n.controllerID); err != nil {
 		n.logger.WithError(err).Warn("unable to do initial controller liveness registration")
 	}
 
-	tick := time.NewTicker(n.checkinInterval)
+	tick := time.NewTicker(n.interval)
 	defer tick.Stop()
 
 	var stop bool
@@ -66,7 +110,11 @@ func (n *NatsController) checkinRoutine(ctx context.Context) {
 						WithField("id", n.controllerID.String()).
 						Fatal("unable to refresh controller liveness token")
 				}
+
+				continue
 			}
+
+			n.logger.Trace("liveness check-in successful")
 		case <-ctx.Done():
 			n.logger.Info("liveness check-in stopping on done context")
 			stop = true
@@ -87,4 +135,72 @@ func refreshControllerToken(id registry.ControllerID) error {
 		return err
 	}
 	return nil
+}
+
+// HttpNatsLiveness  implements the LivenessCheckin interface
+type HttpNatsLiveness struct {
+	logger   *logrus.Logger
+	coClient *co.Client
+	// The caller obtains the controllerID from its ConditionPop request,
+	// the controllerID is set on the StatusValue.WorkerID and Task.WorkerID objects,
+	// by the API endpoint.
+	controllerID registry.ControllerID
+	interval     time.Duration
+	serverID     uuid.UUID
+	conditionID  uuid.UUID
+}
+
+func NewHttpNatsLiveness(
+	coClient *co.Client,
+	conditionID,
+	serverID uuid.UUID,
+	controllerID registry.ControllerID,
+	interval time.Duration,
+	l *logrus.Logger,
+) LivenessCheckin {
+	return &HttpNatsLiveness{
+		logger:       l,
+		conditionID:  conditionID,
+		controllerID: controllerID,
+		serverID:     serverID,
+		interval:     interval,
+		coClient:     coClient,
+	}
+
+}
+
+func (n *HttpNatsLiveness) StartLivenessCheckin(ctx context.Context) {
+	tick := time.NewTicker(n.interval)
+	defer tick.Stop()
+
+	var stop bool
+	for !stop {
+		select {
+		case <-tick.C:
+			resp, err := n.coClient.ControllerCheckin(ctx, n.serverID, n.conditionID, n.controllerID)
+			if err != nil {
+				n.logger.WithError(err).
+					WithField("id", n.controllerID.String()).
+					Warn("controller check-in failed")
+			}
+
+			if resp.StatusCode != 200 {
+				n.logger.
+					WithField("statusCode", resp.StatusCode).
+					Warn("controller check-in returned non 200 status: " + resp.Message)
+
+				continue
+			}
+
+			n.logger.WithField("controllerID", n.controllerID.String()).Debug("check-in successful")
+
+		case <-ctx.Done():
+			n.logger.Info("liveness check-in stopping on done context")
+			stop = true
+		}
+	}
+}
+
+func (n *HttpNatsLiveness) ControllerID() registry.ControllerID {
+	return n.controllerID
 }

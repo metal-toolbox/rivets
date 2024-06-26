@@ -31,15 +31,17 @@ func TestStartLivenessCheckin(t *testing.T) {
 		checkinInterval: checkinInterval,
 	}
 
+	n.liveness = NewNatsLiveness(n.natsConfig, n.stream, n.logger, n.hostname, checkinInterval)
+
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	n.startLivenessCheckin(ctx)
+	n.liveness.StartLivenessCheckin(ctx)
 
 	var ts time.Time
 	var errLastContact error
 	// wait for checkin routine to complete - 5 seconds should be enough?
 	for i := 0; i <= 5; i++ {
-		ts, errLastContact = registry.LastContact(n.controllerID)
+		ts, errLastContact = registry.LastContact(n.liveness.ControllerID())
 		if errLastContact == nil {
 			break
 		}

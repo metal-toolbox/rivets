@@ -73,18 +73,30 @@ func RecordToComponent(rec *ss.ServerComponent) (*rt.Component, error) {
 			}
 			component.Firmware = fwva.Firmware
 		case StatusInbandNS:
-			st := &StatusVersionedAttribute{}
-			if err := UnpackVersionedAttribute(&va, st); err != nil {
+			st := []StatusVersionedAttribute{}
+			if err := UnpackVersionedAttribute(&va, &st); err != nil {
 				return nil, err
 			}
-			component.Status = st.Status
+
+			for _, s := range st {
+				component.Status = s.Status
+				if s.NICPortStatus != nil {
+					component.NICPortStatus = append(component.NICPortStatus, s.NICPortStatus)
+				}
+			}
+
 		case StatusOutofbandNS:
 			if component.Status == nil {
-				st := &StatusVersionedAttribute{}
-				if err := UnpackVersionedAttribute(&va, st); err != nil {
+				st := []StatusVersionedAttribute{}
+				if err := UnpackVersionedAttribute(&va, &st); err != nil {
 					return nil, err
 				}
-				component.Status = st.Status
+				for _, s := range st {
+					component.Status = s.Status
+					if s.NICPortStatus != nil {
+						component.NICPortStatus = append(component.NICPortStatus, s.NICPortStatus)
+					}
+				}
 			}
 		}
 	}

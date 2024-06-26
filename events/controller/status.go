@@ -7,10 +7,11 @@ import (
 	"reflect"
 	"time"
 
+	"github.com/google/uuid"
+	"github.com/metal-toolbox/rivets/events/registry"
 	"github.com/nats-io/nats.go"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
-	"go.hollow.sh/toolbox/events/registry"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
@@ -18,6 +19,8 @@ import (
 	"github.com/metal-toolbox/rivets/condition"
 	"github.com/metal-toolbox/rivets/events"
 	"github.com/metal-toolbox/rivets/events/pkg/kv"
+
+	co "github.com/metal-toolbox/conditionorc/pkg/api/v1/client"
 )
 
 var (
@@ -32,38 +35,49 @@ var (
 
 // ConditionStatusPublisher defines an interface for publishing status updates for conditions.
 type ConditionStatusPublisher interface {
-	Publish(ctx context.Context, serverID string, state condition.State, status json.RawMessage) error
-	UpdateTimestamp(ctx context.Context)
+	Publish(ctx context.Context, serverID string, state condition.State, status json.RawMessage, tsUpdateOnly bool) error
 }
 
 // NatsConditionStatusPublisher implements the StatusPublisher interface to publish condition status updates using NATS.
 type NatsConditionStatusPublisher struct {
-	kv           nats.KeyValue
-	log          *logrus.Logger
-	facilityCode string
-	conditionID  string
-	controllerID string
-	lastRev      uint64
+	kv            nats.KeyValue
+	log           *logrus.Logger
+	facilityCode  string
+	conditionID   string
+	conditionKind condition.Kind
+	controllerID  string
+	lastRev       uint64
 }
 
 // NewNatsConditionStatusPublisher creates a new NatsConditionStatusPublisher for a given condition ID.
 //
 // It initializes a NATS KeyValue store for tracking condition statuses.
-func (n *NatsController) NewNatsConditionStatusPublisher(conditionID string) (*NatsConditionStatusPublisher, error) {
+func NewNatsConditionStatusPublisher(
+	appName,
+	conditionID,
+	facilityCode string,
+	conditionKind condition.Kind,
+	controllerID registry.ControllerID,
+	kvReplicas int,
+	stream *events.NatsJetstream,
+	logger *logrus.Logger,
+) (ConditionStatusPublisher, error) {
 	kvOpts := []kv.Option{
-		kv.WithDescription(fmt.Sprintf("%s condition status tracking", n.natsConfig.AppName)),
+		kv.WithDescription(fmt.Sprintf("%s condition status tracking", appName)),
 		kv.WithTTL(kvTTL),
-		kv.WithReplicas(n.natsConfig.KVReplicationFactor),
+		kv.WithReplicas(kvReplicas),
 	}
 
 	errKV := errors.New("unable to bind to status KV bucket")
-	statusKV, err := kv.CreateOrBindKVBucket(n.stream.(*events.NatsJetstream), string(n.conditionKind), kvOpts...)
+	//statusKV, err := kv.CreateOrBindKVBucket(n.stream.(*events.NatsJetstream), string(n.conditionKind), kvOpts...)
+	statusKV, err := kv.CreateOrBindKVBucket(stream, string(conditionKind), kvOpts...)
 	if err != nil {
-		return nil, errors.Wrap(errKV, err.Error())
+		logger.WithField("bucket", conditionKind).WithError(err).Error(errKV.Error())
+		return nil, errors.Wrap(errKV, err.Error()+"bucket: "+string(conditionKind))
 	}
 
 	// retrieve current key revision if key exists
-	ckey := key(n.facilityCode, conditionID)
+	ckey := kv.StatusValueKVKey(facilityCode, conditionID)
 	currStatusEntry, errGet := statusKV.Get(ckey)
 	if errGet != nil && !errors.Is(errGet, nats.ErrKeyNotFound) {
 		return nil, errors.Wrap(
@@ -78,61 +92,58 @@ func (n *NatsController) NewNatsConditionStatusPublisher(conditionID string) (*N
 	}
 
 	return &NatsConditionStatusPublisher{
-		facilityCode: n.facilityCode,
-		conditionID:  conditionID,
-		controllerID: n.controllerID.String(),
-		kv:           statusKV,
-		log:          n.logger,
-		lastRev:      lastRev,
+		facilityCode:  facilityCode,
+		conditionID:   conditionID,
+		controllerID:  controllerID.String(),
+		conditionKind: conditionKind,
+		kv:            statusKV,
+		log:           logger,
+		lastRev:       lastRev,
 	}, nil
 }
 
-func key(facilityCode, conditionID string) string {
-	return fmt.Sprintf("%s.%s", facilityCode, conditionID)
-}
-
-func (s *NatsConditionStatusPublisher) UpdateTimestamp(ctx context.Context) {
-	key := key(s.facilityCode, s.conditionID)
-	_, span := otel.Tracer(pkgName).Start(
-		ctx,
-		"controller.Publish.updateConditionTS",
-		trace.WithSpanKind(trace.SpanKindConsumer),
-	)
-	defer span.End()
-
-	rev, err := s.update(key, nil, true)
-	if err != nil {
-		metricsNATSError("update-condition-ts")
-		span.AddEvent("condition TS update failure",
-			trace.WithAttributes(
-				attribute.String("controllerID", s.controllerID),
-				attribute.String("conditionID", s.conditionID),
-				attribute.String("error", err.Error()),
-			),
-		)
-
-		s.log.WithError(err).WithFields(logrus.Fields{
-			"assetFacilityCode": s.facilityCode,
-			"conditionID":       s.conditionID,
-			"lastRev":           s.lastRev,
-			"controllerID":      s.controllerID,
-			"key":               key,
-		}).Warn("unable to update condition TS")
-		return
-	}
-
-	s.log.WithFields(logrus.Fields{
-		"assetFacilityCode": s.facilityCode,
-		"taskID":            s.conditionID,
-		"lastRev":           s.lastRev,
-		"key":               key,
-	}).Trace("condition TS updated")
-	s.lastRev = rev
-}
+//func (s *NatsConditionStatusPublisher) UpdateTimestamp(ctx context.Context) {
+//	key := kv.StatusValueKVKey(s.facilityCode, s.conditionID)
+//	_, span := otel.Tracer(pkgNameNatsController).Start(
+//		ctx,
+//		"controller.Publish.updateConditionTS",
+//		trace.WithSpanKind(trace.SpanKindConsumer),
+//	)
+//	defer span.End()
+//
+//	rev, err := s.update(key, nil, true)
+//	if err != nil {
+//		metricsNATSError("update-condition-ts")
+//		span.AddEvent("condition TS update failure",
+//			trace.WithAttributes(
+//				attribute.String("controllerID", s.controllerID),
+//				attribute.String("conditionID", s.conditionID),
+//				attribute.String("error", err.Error()),
+//			),
+//		)
+//
+//		s.log.WithError(err).WithFields(logrus.Fields{
+//			"assetFacilityCode": s.facilityCode,
+//			"conditionID":       s.conditionID,
+//			"lastRev":           s.lastRev,
+//			"controllerID":      s.controllerID,
+//			"key":               key,
+//		}).Warn("unable to update condition TS")
+//		return
+//	}
+//
+//	s.log.WithFields(logrus.Fields{
+//		"assetFacilityCode": s.facilityCode,
+//		"taskID":            s.conditionID,
+//		"lastRev":           s.lastRev,
+//		"key":               key,
+//	}).Trace("condition TS updated")
+//	s.lastRev = rev
+//}
 
 // Publish implements the StatusPublisher interface. It serializes and publishes the current status of a condition to NATS.
-func (s *NatsConditionStatusPublisher) Publish(ctx context.Context, serverID string, state condition.State, status json.RawMessage) error {
-	_, span := otel.Tracer(pkgName).Start(
+func (s *NatsConditionStatusPublisher) Publish(ctx context.Context, serverID string, state condition.State, status json.RawMessage, tsUpdateOnly bool) error {
+	_, span := otel.Tracer(pkgNameNatsController).Start(
 		ctx,
 		"controller.Publish.KV",
 		trace.WithSpanKind(trace.SpanKindConsumer),
@@ -149,7 +160,7 @@ func (s *NatsConditionStatusPublisher) Publish(ctx context.Context, serverID str
 		UpdatedAt: time.Now(),
 	}
 
-	key := key(s.facilityCode, s.conditionID)
+	key := kv.StatusValueKVKey(s.facilityCode, s.conditionID)
 
 	var err error
 	var rev uint64
@@ -157,7 +168,7 @@ func (s *NatsConditionStatusPublisher) Publish(ctx context.Context, serverID str
 		sv.CreatedAt = time.Now()
 		rev, err = s.kv.Create(key, sv.MustBytes())
 	} else {
-		rev, err = s.update(key, sv, false)
+		rev, err = s.update(key, sv, tsUpdateOnly)
 	}
 
 	if err != nil {
@@ -258,7 +269,7 @@ func statusValueUpdate(curSV, newSV *condition.StatusValue) (updateSV *condition
 		updateSV.State = curSV.State
 	}
 
-	svEqual, err := svBytesEqual(curSV.Status, newSV.Status)
+	srEqual, err := statusRecordBytesEqual(curSV.Status, newSV.Status)
 	if err != nil {
 		return nil, errors.Wrap(errStatusValue, err.Error())
 	}
@@ -266,7 +277,7 @@ func statusValueUpdate(curSV, newSV *condition.StatusValue) (updateSV *condition
 	// update Status
 	//
 	// At minimum a valid Status JSON has 9 chars - `{"a": "b"}`
-	if newSV.Status != nil && !svEqual && len(newSV.Status) >= 9 {
+	if newSV.Status != nil && !srEqual && len(newSV.Status) >= 9 {
 		updateSV.Status = newSV.Status
 	} else {
 		updateSV.Status = curSV.Status
@@ -278,7 +289,7 @@ func statusValueUpdate(curSV, newSV *condition.StatusValue) (updateSV *condition
 // svBytesEqual compares the JSON in the two json.RawMessage
 //
 // source: https://stackoverflow.com/questions/32408890/how-to-compare-two-json-requests
-func svBytesEqual(curSV, newSV json.RawMessage) (bool, error) {
+func statusRecordBytesEqual(curSV, newSV json.RawMessage) (bool, error) {
 	var j, j2 interface{}
 	if err := json.Unmarshal(curSV, &j); err != nil {
 		return false, errors.Wrap(err, "current StatusValue unmarshal error")
@@ -306,6 +317,7 @@ const (
 type ConditionStatusQueryor interface {
 	// ConditionState returns the current state of a condition based on its ID.
 	ConditionState(conditionID string) ConditionState
+	ConditionStatusValue(conditionID string) (*condition.StatusValue, error)
 }
 
 // NatsConditionStatusQueryor implements ConditionStatusQueryor to query condition states using NATS.
@@ -318,38 +330,46 @@ type NatsConditionStatusQueryor struct {
 
 // NewNatsConditionStatusQueryor creates a new NatsConditionStatusQueryor instance, initializing a NATS KeyValue store for condition status queries.
 func (n *NatsController) NewNatsConditionStatusQueryor() (*NatsConditionStatusQueryor, error) {
+	kvOpts := []kv.Option{
+		kv.WithDescription(fmt.Sprintf("%s condition status tracking", n.natsConfig.AppName)),
+		kv.WithTTL(kvTTL),
+		kv.WithReplicas(n.natsConfig.KVReplicationFactor),
+	}
+
 	errKV := errors.New("unable to connect to status KV for condition progress lookup")
-	kvHandle, err := events.AsNatsJetStreamContext(n.stream.(*events.NatsJetstream)).KeyValue(string(n.conditionKind))
+	kvHandle, err := kv.CreateOrBindKVBucket(n.stream.(*events.NatsJetstream), string(n.conditionKind), kvOpts...)
 	if err != nil {
-		n.logger.WithError(err).Error(errKV.Error())
-		return nil, errors.Wrap(errKV, err.Error())
+		n.logger.WithField("bucket", n.conditionKind).WithError(err).Error(errKV.Error())
+		return nil, errors.Wrap(errKV, err.Error()+"bucket: "+string(n.conditionKind))
 	}
 
 	return &NatsConditionStatusQueryor{
 		kv:           kvHandle,
 		logger:       n.logger,
 		facilityCode: n.facilityCode,
-		controllerID: n.controllerID.String(),
+		controllerID: n.ID(),
 	}, nil
 }
 
-// ConditionState queries the NATS KeyValue store to determine the current state of a condition.
-func (p *NatsConditionStatusQueryor) ConditionState(conditionID string) ConditionState {
-	key := key(p.facilityCode, conditionID)
+func (p *NatsConditionStatusQueryor) statusValue(conditionID string) (*condition.StatusValue, error) {
+	errStatusValue = errors.New("error condition status")
+
+	key := kv.StatusValueKVKey(p.facilityCode, conditionID)
 	entry, err := p.kv.Get(key)
 	switch err {
 	case nats.ErrKeyNotFound:
 		// This should be by far the most common path through this code.
-		return notStarted
+		return nil, err
 	case nil:
 		break // we'll handle this outside the switch
 	default:
 		p.logger.WithError(err).WithFields(logrus.Fields{
 			"conditionID": conditionID,
 			"key":         key,
+			"err":         err.Error(),
 		}).Warn("error reading condition status")
 
-		return indeterminate
+		return nil, errors.Wrap(errStatusValue, err.Error())
 	}
 
 	// we have an status entry for this condition, is is complete?
@@ -360,9 +380,28 @@ func (p *NatsConditionStatusQueryor) ConditionState(conditionID string) Conditio
 			"lookupKey":   key,
 		}).Warn("unable to construct a sane status for this condition")
 
+		return nil, errors.Wrap(errStatusValue, err.Error())
+	}
+
+	return &sv, nil
+}
+
+func (p *NatsConditionStatusQueryor) ConditionStatusValue(conditionID string) (*condition.StatusValue, error) {
+	return p.statusValue(conditionID)
+}
+
+// ConditionState queries the NATS KeyValue store to determine the current state of a condition.
+func (p *NatsConditionStatusQueryor) ConditionState(conditionID string) ConditionState {
+	sv, err := p.statusValue(conditionID)
+	if err != nil {
+		if errors.Is(err, nats.ErrKeyNotFound) {
+			return notStarted
+		}
+
 		return indeterminate
 	}
 
+	key := kv.StatusValueKVKey(p.facilityCode, conditionID)
 	if condition.State(sv.State) == condition.Failed ||
 		condition.State(sv.State) == condition.Succeeded {
 		p.logger.WithFields(logrus.Fields{
@@ -481,4 +520,65 @@ func (p *natsEventStatusAcknowleger) nak() {
 	}
 
 	p.logger.Trace("event nak successful")
+}
+
+// NatsHttpConditionStatusPublisher implements the StatusPublisher interface to publish condition status updates over HTTP to NATS.
+type HttpConditionStatusPublisher struct {
+	logger        *logrus.Logger
+	coClient      *co.Client
+	conditionKind condition.Kind
+	conditionID   uuid.UUID
+	serverID      uuid.UUID
+	controllerID  registry.ControllerID
+}
+
+func NewHttpConditionStatusPublisher(
+	serverID,
+	conditionID uuid.UUID,
+	conditionKind condition.Kind,
+	controllerID registry.ControllerID,
+	coClient *co.Client,
+	logger *logrus.Logger,
+) ConditionStatusPublisher {
+	return &HttpConditionStatusPublisher{
+		coClient:      coClient,
+		conditionID:   conditionID,
+		conditionKind: conditionKind,
+		serverID:      serverID,
+		controllerID:  controllerID,
+		logger:        logger,
+	}
+}
+
+func (s *HttpConditionStatusPublisher) Publish(ctx context.Context, serverID string, state condition.State, status json.RawMessage, tsUpdateOnly bool) error {
+	_, span := otel.Tracer(pkgNameNatsController).Start(
+		ctx,
+		"controller.status_http.Publish",
+		trace.WithSpanKind(trace.SpanKindConsumer),
+	)
+	defer span.End()
+
+	sv := &condition.StatusValue{
+		WorkerID:  s.controllerID.String(),
+		Target:    s.serverID.String(),
+		TraceID:   trace.SpanFromContext(ctx).SpanContext().TraceID().String(),
+		SpanID:    trace.SpanFromContext(ctx).SpanContext().SpanID().String(),
+		State:     string(state),
+		Status:    status,
+		UpdatedAt: time.Now(),
+	}
+
+	resp, err := s.coClient.ConditionStatusUpdate(ctx, s.conditionKind, s.serverID, s.conditionID, s.controllerID, sv, tsUpdateOnly)
+	if err != nil {
+		s.logger.WithError(err).Error("condition status update error")
+		return err
+	}
+
+	s.logger.WithFields(
+		logrus.Fields{
+			"status": resp.StatusCode,
+		},
+	).Trace("condition status update published successfully")
+
+	return nil
 }
