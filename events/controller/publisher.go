@@ -26,7 +26,7 @@ type Publisher interface {
 
 type PublisherHttp struct {
 	logger               *logrus.Logger
-	statusValuePublisher *HttpConditionStatusPublisher
+	statusValuePublisher *HTTPConditionStatusPublisher
 	taskRepository       *HttpTaskRepository
 }
 
@@ -38,7 +38,7 @@ func NewHttpPublisher(serverID,
 	logger *logrus.Logger) Publisher {
 
 	p := &PublisherHttp{logger: logger}
-	httpStatusValuePublisher := NewHttpConditionStatusPublisher(
+	httpStatusValuePublisher := NewHTTPConditionStatusPublisher(
 		serverID,
 		conditionID,
 		conditionKind,
@@ -47,7 +47,7 @@ func NewHttpPublisher(serverID,
 		logger,
 	)
 
-	p.statusValuePublisher = httpStatusValuePublisher.(*HttpConditionStatusPublisher)
+	p.statusValuePublisher = httpStatusValuePublisher.(*HTTPConditionStatusPublisher)
 
 	httpTaskRepository := NewHttpTaskRepository(
 		serverID,

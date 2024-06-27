@@ -69,7 +69,6 @@ func NewNatsConditionStatusPublisher(
 	}
 
 	errKV := errors.New("unable to bind to status KV bucket")
-	//statusKV, err := kv.CreateOrBindKVBucket(n.stream.(*events.NatsJetstream), string(n.conditionKind), kvOpts...)
 	statusKV, err := kv.CreateOrBindKVBucket(stream, string(conditionKind), kvOpts...)
 	if err != nil {
 		logger.WithField("bucket", conditionKind).WithError(err).Error(errKV.Error())
@@ -101,45 +100,6 @@ func NewNatsConditionStatusPublisher(
 		lastRev:       lastRev,
 	}, nil
 }
-
-//func (s *NatsConditionStatusPublisher) UpdateTimestamp(ctx context.Context) {
-//	key := kv.StatusValueKVKey(s.facilityCode, s.conditionID)
-//	_, span := otel.Tracer(pkgNameNatsController).Start(
-//		ctx,
-//		"controller.Publish.updateConditionTS",
-//		trace.WithSpanKind(trace.SpanKindConsumer),
-//	)
-//	defer span.End()
-//
-//	rev, err := s.update(key, nil, true)
-//	if err != nil {
-//		metricsNATSError("update-condition-ts")
-//		span.AddEvent("condition TS update failure",
-//			trace.WithAttributes(
-//				attribute.String("controllerID", s.controllerID),
-//				attribute.String("conditionID", s.conditionID),
-//				attribute.String("error", err.Error()),
-//			),
-//		)
-//
-//		s.log.WithError(err).WithFields(logrus.Fields{
-//			"assetFacilityCode": s.facilityCode,
-//			"conditionID":       s.conditionID,
-//			"lastRev":           s.lastRev,
-//			"controllerID":      s.controllerID,
-//			"key":               key,
-//		}).Warn("unable to update condition TS")
-//		return
-//	}
-//
-//	s.log.WithFields(logrus.Fields{
-//		"assetFacilityCode": s.facilityCode,
-//		"taskID":            s.conditionID,
-//		"lastRev":           s.lastRev,
-//		"key":               key,
-//	}).Trace("condition TS updated")
-//	s.lastRev = rev
-//}
 
 // Publish implements the StatusPublisher interface. It serializes and publishes the current status of a condition to NATS.
 func (s *NatsConditionStatusPublisher) Publish(ctx context.Context, serverID string, state condition.State, status json.RawMessage, tsUpdateOnly bool) error {
@@ -522,8 +482,8 @@ func (p *natsEventStatusAcknowleger) nak() {
 	p.logger.Trace("event nak successful")
 }
 
-// NatsHttpConditionStatusPublisher implements the StatusPublisher interface to publish condition status updates over HTTP to NATS.
-type HttpConditionStatusPublisher struct {
+// HTTPConditionStatusPublisher implements the StatusPublisher interface to publish condition status updates over HTTP to NATS.
+type HTTPConditionStatusPublisher struct {
 	logger        *logrus.Logger
 	coClient      *co.Client
 	conditionKind condition.Kind
@@ -532,7 +492,7 @@ type HttpConditionStatusPublisher struct {
 	controllerID  registry.ControllerID
 }
 
-func NewHttpConditionStatusPublisher(
+func NewHTTPConditionStatusPublisher(
 	serverID,
 	conditionID uuid.UUID,
 	conditionKind condition.Kind,
@@ -540,7 +500,7 @@ func NewHttpConditionStatusPublisher(
 	coClient *co.Client,
 	logger *logrus.Logger,
 ) ConditionStatusPublisher {
-	return &HttpConditionStatusPublisher{
+	return &HTTPConditionStatusPublisher{
 		coClient:      coClient,
 		conditionID:   conditionID,
 		conditionKind: conditionKind,
@@ -550,7 +510,7 @@ func NewHttpConditionStatusPublisher(
 	}
 }
 
-func (s *HttpConditionStatusPublisher) Publish(ctx context.Context, serverID string, state condition.State, status json.RawMessage, tsUpdateOnly bool) error {
+func (s *HTTPConditionStatusPublisher) Publish(ctx context.Context, serverID string, state condition.State, status json.RawMessage, tsUpdateOnly bool) error {
 	_, span := otel.Tracer(pkgNameNatsController).Start(
 		ctx,
 		"controller.status_http.Publish",
