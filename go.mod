@@ -2,7 +2,7 @@ module github.com/metal-toolbox/rivets
 
 go 1.22
 
-toolchain go1.22.2
+toolchain go1.22.4
 
 require (
 	github.com/bmc-toolbox/common v0.0.0-20240510143200-3db7cecbb5a6
