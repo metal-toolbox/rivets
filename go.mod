@@ -9,8 +9,8 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/hashicorp/go-multierror v1.1.1
 	github.com/metal-toolbox/fleetdb v1.18.6
-	github.com/nats-io/nats-server/v2 v2.10.12
-	github.com/nats-io/nats.go v1.34.1
+	github.com/nats-io/nats-server/v2 v2.10.17
+	github.com/nats-io/nats.go v1.36.0
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.19.1
 	github.com/sirupsen/logrus v1.9.3
@@ -61,7 +61,7 @@ require (
 	github.com/jackc/pgx/v4 v4.18.3 // indirect
 	github.com/jmoiron/sqlx v1.4.0 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
-	github.com/klauspost/compress v1.17.7 // indirect
+	github.com/klauspost/compress v1.17.9 // indirect
 	github.com/klauspost/cpuid/v2 v2.2.8 // indirect
 	github.com/leodido/go-urn v1.4.0 // indirect
 	github.com/lib/pq v1.10.9 // indirect
@@ -70,7 +70,7 @@ require (
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.2 // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
-	github.com/nats-io/jwt/v2 v2.5.5 // indirect
+	github.com/nats-io/jwt/v2 v2.5.7 // indirect
 	github.com/nats-io/nkeys v0.4.7 // indirect
 	github.com/nats-io/nuid v1.0.1 // indirect
 	github.com/pelletier/go-toml/v2 v2.2.2 // indirect
