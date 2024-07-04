@@ -110,3 +110,14 @@ func LastContact(id ControllerID) (time.Time, error) {
 	}
 	return ar.LastActive, nil
 }
+
+// SetHandle is a helper method which assigns the nats.KeyValue to the pkg global registry
+func SetHandle(handle nats.KeyValue) error {
+	if registry != nil {
+		return ErrRegistryPreviouslyInitialized
+	}
+
+	registry = handle
+
+	return nil
+}
