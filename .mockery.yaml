@@ -12,6 +12,7 @@ packages:
       ConditionStatusQueryor:
       ConditionStatusPublisher:
       eventStatusAcknowleger:
+      LivenessCheckin:
   github.com/metal-toolbox/rivets/events:
     config:
       dir: events/
