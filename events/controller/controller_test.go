@@ -155,6 +155,8 @@ func TestProcessCondition(t *testing.T) {
 		},
 	}
 
+	controllerID := registry.GetID("test")
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			cond := &condition.Condition{ID: tt.conditionID}
@@ -191,12 +193,15 @@ func TestProcessCondition(t *testing.T) {
 				cStatusPublisher.On("Publish", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
 			}
 
+			mockLiveness := NewMockLivenessCheckin(t)
+			mockLiveness.On("ControllerID").Return(controllerID)
+
 			l := logrus.New()
 			l.Level = 0 // set higher value to debug
 			n := &NatsController{
 				logger:                  l,
-				controllerID:            registry.GetID("mock"),
 				conditionHandlerFactory: func() ConditionHandler { return handler },
+				liveness:                mockLiveness,
 			}
 
 			n.processCondition(context.Background(), cond, eStatusAcknowledger, cStatusQueryor, cStatusPublisher)
