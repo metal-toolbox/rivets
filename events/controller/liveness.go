@@ -8,6 +8,7 @@ import (
 	"github.com/metal-toolbox/rivets/events"
 	"github.com/metal-toolbox/rivets/events/pkg/kv"
 	"github.com/metal-toolbox/rivets/events/registry"
+	"github.com/sirupsen/logrus"
 
 	"github.com/nats-io/nats.go"
 	"github.com/pkg/errors"
@@ -19,7 +20,41 @@ var (
 	checkinLivenessTTL = 3 * time.Minute
 )
 
-func (n *NatsController) checkinKVOpts() []kv.Option {
+type LivenessCheckin interface {
+	StartLivenessCheckin(ctx context.Context)
+	ControllerID() registry.ControllerID
+}
+
+// NatsLiveness provides methods to register and periodically check into the controller registry.
+//
+// It implements the LivenessCheckin interface
+type NatsLiveness struct {
+	logger       *logrus.Logger
+	stream       events.Stream
+	natsConfig   events.NatsOptions
+	controllerID registry.ControllerID
+	interval     time.Duration
+	hostname     string
+}
+
+// NewNatsLiveness returns a NATS implementation of the LivenessCheckin interface
+func NewNatsLiveness(
+	cfg events.NatsOptions, // nolint:gocritic // heavy param is heavy
+	stream events.Stream,
+	l *logrus.Logger,
+	hostname string,
+	interval time.Duration,
+) LivenessCheckin {
+	return &NatsLiveness{
+		logger:     l,
+		stream:     stream,
+		natsConfig: cfg,
+		hostname:   hostname,
+		interval:   interval,
+	}
+}
+
+func (n *NatsLiveness) checkinKVOpts() []kv.Option {
 	opts := []kv.Option{
 		kv.WithTTL(checkinLivenessTTL),
 		kv.WithReplicas(n.natsConfig.KVReplicationFactor),
@@ -28,8 +63,13 @@ func (n *NatsController) checkinKVOpts() []kv.Option {
 	return opts
 }
 
+// Returns the controller ID for this instance
+func (n *NatsLiveness) ControllerID() registry.ControllerID {
+	return n.controllerID
+}
+
 // This starts a go-routine to peridically check in with the NATS kv
-func (n *NatsController) startLivenessCheckin(ctx context.Context) {
+func (n *NatsLiveness) StartLivenessCheckin(ctx context.Context) {
 	once.Do(func() {
 		n.controllerID = registry.GetID(n.hostname)
 
@@ -43,12 +83,12 @@ func (n *NatsController) startLivenessCheckin(ctx context.Context) {
 	})
 }
 
-func (n *NatsController) checkinRoutine(ctx context.Context) {
+func (n *NatsLiveness) checkinRoutine(ctx context.Context) {
 	if err := registry.RegisterController(n.controllerID); err != nil {
 		n.logger.WithError(err).Warn("unable to do initial controller liveness registration")
 	}
 
-	tick := time.NewTicker(n.checkinInterval)
+	tick := time.NewTicker(n.interval)
 	defer tick.Stop()
 
 	var stop bool
