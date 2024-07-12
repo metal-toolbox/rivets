@@ -11,7 +11,6 @@ import (
 
 	"github.com/metal-toolbox/rivets/condition"
 	"github.com/metal-toolbox/rivets/events"
-	"github.com/metal-toolbox/rivets/events/registry"
 	"github.com/nats-io/nats.go"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -49,7 +48,6 @@ var (
 )
 
 type NatsController struct {
-	controllerID      registry.ControllerID
 	stream            events.Stream
 	syncWG            *sync.WaitGroup
 	logger            *logrus.Logger
@@ -65,8 +63,10 @@ type NatsController struct {
 	// Factory method returns a condition event handler
 	// set by the caller when calling ListenEvents()
 	conditionHandlerFactory ConditionHandlerFactory
-	concurrency             int
-	dispatched              int32
+	// controller liveness interface
+	liveness    LivenessCheckin
+	concurrency int
+	dispatched  int32
 }
 
 // Option sets parameters on the NatsController
@@ -143,7 +143,7 @@ func WithConnectionTimeout(t time.Duration) Option {
 }
 
 func (n *NatsController) ID() string {
-	return n.controllerID.String()
+	return n.liveness.ControllerID().String()
 }
 
 func (n *NatsController) FacilityCode() string {
@@ -179,7 +179,8 @@ func (n *NatsController) Connect(ctx context.Context) error {
 		return errors.Wrap(errStreamSub, err.Error())
 	}
 
-	n.startLivenessCheckin(ctx)
+	n.liveness = NewNatsLiveness(n.natsConfig, n.stream, n.logger, n.hostname, checkinInterval)
+	n.liveness.StartLivenessCheckin(ctx)
 	n.logger.WithFields(
 		logrus.Fields{
 			"hostname":      n.hostname,
@@ -332,7 +333,7 @@ func (n *NatsController) processConditionFromEvent(ctx context.Context, msg even
 	if err != nil {
 		n.logger.WithField("conditionID", cond.ID.String()).Warn("failed to initialize publisher")
 		eventAcknowleger.nak()
-		spanEvent(span, cond, n.controllerID.String(), "sent nack, failed to initialize publisher: "+err.Error())
+		spanEvent(span, cond, n.ID(), "sent nack, failed to initialize publisher: "+err.Error())
 		return
 	}
 
@@ -384,34 +385,34 @@ func (n *NatsController) processCondition(
 	case inProgress:
 		n.logger.WithField("conditionID", cond.ID.String()).Info("condition is already in progress")
 		eventAcknowleger.inProgress()
-		spanEvent(span, cond, n.controllerID.String(), "ackInProgress")
+		spanEvent(span, cond, n.ID(), "ackInProgress")
 
 		return
 
 	case complete:
 		n.logger.WithField("conditionID", cond.ID.String()).Info("condition is complete")
 		eventAcknowleger.complete()
-		spanEvent(span, cond, n.controllerID.String(), "ackComplete")
+		spanEvent(span, cond, n.ID(), "ackComplete")
 
 		return
 
 	case orphaned:
 		n.logger.WithField("conditionID", cond.ID.String()).Warn("restarting this condition")
 		eventAcknowleger.inProgress()
-		spanEvent(span, cond, n.controllerID.String(), "restarting condition")
+		spanEvent(span, cond, n.ID(), "restarting condition")
 
 	// we need to restart this event
 	case notStarted:
 		n.logger.WithField("conditionID", cond.ID.String()).Info("starting new condition")
 		eventAcknowleger.inProgress()
-		spanEvent(span, cond, n.controllerID.String(), "start new condition")
+		spanEvent(span, cond, n.ID(), "start new condition")
 
 	// break out here, this is a new event
 	case indeterminate:
 		n.logger.WithField("conditionID", cond.ID.String()).Warn("unable to determine state of this condition")
 		// send it back to NATS to try again
 		eventAcknowleger.nak()
-		spanEvent(span, cond, n.controllerID.String(), "sent nack, indeterminate state")
+		spanEvent(span, cond, n.ID(), "sent nack, indeterminate state")
 
 		return
 	}
@@ -436,7 +437,7 @@ func (n *NatsController) processCondition(
 		spanEvent(
 			span,
 			cond,
-			n.controllerID.String(),
+			n.ID(),
 			"condition handler returned error: "+errHandler.Error(),
 		)
 	}
@@ -446,7 +447,7 @@ func (n *NatsController) processCondition(
 	spanEvent(
 		span,
 		cond,
-		n.controllerID.String(),
+		n.ID(),
 		"condition complete",
 	)
 }
