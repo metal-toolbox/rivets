@@ -80,7 +80,7 @@ func (n *NatsController) NewNatsConditionStatusPublisher(conditionID string) (*N
 	return &NatsConditionStatusPublisher{
 		facilityCode: n.facilityCode,
 		conditionID:  conditionID,
-		controllerID: n.controllerID.String(),
+		controllerID: n.ID(),
 		kv:           statusKV,
 		log:          n.logger,
 		lastRev:      lastRev,
@@ -329,7 +329,7 @@ func (n *NatsController) NewNatsConditionStatusQueryor() (*NatsConditionStatusQu
 		kv:           kvHandle,
 		logger:       n.logger,
 		facilityCode: n.facilityCode,
-		controllerID: n.controllerID.String(),
+		controllerID: n.ID(),
 	}, nil
 }
 

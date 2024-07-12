@@ -70,13 +70,16 @@ func TestNewNatsConditionStatusPublisher(t *testing.T) {
 	}
 
 	const facilityCode = "fac13"
+	controllerID := registry.GetID("test")
+	mockLiveness := NewMockLivenessCheckin(t)
+	mockLiveness.On("ControllerID").Return(controllerID)
 
 	controller := &NatsController{
 		stream:        evJS,
 		facilityCode:  facilityCode,
-		controllerID:  registry.GetID("kvtest"),
 		conditionKind: cond.Kind,
 		logger:        logrus.New(),
+		liveness:      mockLiveness,
 	}
 
 	// test happy case
@@ -128,12 +131,16 @@ func TestPublish(t *testing.T) {
 
 	const facilityCode = "fac13"
 
+	controllerID := registry.GetID("test")
+	mockLiveness := NewMockLivenessCheckin(t)
+	mockLiveness.On("ControllerID").Return(controllerID)
+
 	controller := &NatsController{
 		stream:        evJS,
 		facilityCode:  facilityCode,
-		controllerID:  registry.GetID("kvtest"),
 		conditionKind: cond.Kind,
 		logger:        logrus.New(),
+		liveness:      mockLiveness,
 	}
 
 	publisher, err := controller.NewNatsConditionStatusPublisher(cond.ID.String())
