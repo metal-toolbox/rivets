@@ -32,8 +32,7 @@ var (
 
 // ConditionStatusPublisher defines an interface for publishing status updates for conditions.
 type ConditionStatusPublisher interface {
-	Publish(ctx context.Context, serverID string, state condition.State, status json.RawMessage) error
-	UpdateTimestamp(ctx context.Context)
+	Publish(ctx context.Context, serverID string, state condition.State, status json.RawMessage, tsUpdateOnly bool) error
 }
 
 // NatsConditionStatusPublisher implements the StatusPublisher interface to publish condition status updates using NATS.
@@ -96,51 +95,8 @@ func NewNatsConditionStatusPublisher(
 	}, nil
 }
 
-func key(facilityCode, conditionID string) string {
-	return fmt.Sprintf("%s.%s", facilityCode, conditionID)
-}
-
-func (s *NatsConditionStatusPublisher) UpdateTimestamp(ctx context.Context) {
-	key := key(s.facilityCode, s.conditionID)
-	_, span := otel.Tracer(pkgName).Start(
-		ctx,
-		"controller.Publish.updateConditionTS",
-		trace.WithSpanKind(trace.SpanKindConsumer),
-	)
-	defer span.End()
-
-	rev, err := s.update(key, nil, true)
-	if err != nil {
-		metricsNATSError("update-condition-ts")
-		span.AddEvent("condition TS update failure",
-			trace.WithAttributes(
-				attribute.String("controllerID", s.controllerID),
-				attribute.String("conditionID", s.conditionID),
-				attribute.String("error", err.Error()),
-			),
-		)
-
-		s.log.WithError(err).WithFields(logrus.Fields{
-			"assetFacilityCode": s.facilityCode,
-			"conditionID":       s.conditionID,
-			"lastRev":           s.lastRev,
-			"controllerID":      s.controllerID,
-			"key":               key,
-		}).Warn("unable to update condition TS")
-		return
-	}
-
-	s.log.WithFields(logrus.Fields{
-		"assetFacilityCode": s.facilityCode,
-		"taskID":            s.conditionID,
-		"lastRev":           s.lastRev,
-		"key":               key,
-	}).Trace("condition TS updated")
-	s.lastRev = rev
-}
-
 // Publish implements the StatusPublisher interface. It serializes and publishes the current status of a condition to NATS.
-func (s *NatsConditionStatusPublisher) Publish(ctx context.Context, serverID string, state condition.State, status json.RawMessage) error {
+func (s *NatsConditionStatusPublisher) Publish(ctx context.Context, serverID string, state condition.State, status json.RawMessage, tsUpdateOnly bool) error {
 	_, span := otel.Tracer(pkgName).Start(
 		ctx,
 		"controller.Publish.KV",
@@ -166,7 +122,7 @@ func (s *NatsConditionStatusPublisher) Publish(ctx context.Context, serverID str
 		sv.CreatedAt = time.Now()
 		rev, err = s.kv.Create(key, sv.MustBytes())
 	} else {
-		rev, err = s.update(key, sv, false)
+		rev, err = s.update(key, sv, tsUpdateOnly)
 	}
 
 	if err != nil {
@@ -177,6 +133,7 @@ func (s *NatsConditionStatusPublisher) Publish(ctx context.Context, serverID str
 				attribute.String("serverID", serverID),
 				attribute.String("conditionID", s.conditionID),
 				attribute.String("error", err.Error()),
+				attribute.Bool("tsUpdateOnly", tsUpdateOnly),
 			),
 		)
 
@@ -187,6 +144,7 @@ func (s *NatsConditionStatusPublisher) Publish(ctx context.Context, serverID str
 			"lastRev":           s.lastRev,
 			"controllerID":      s.controllerID,
 			"key":               key,
+			"tsUpdateOnly":      tsUpdateOnly,
 		}).Warn("Condition status publish failed")
 
 		return errors.Wrap(errStatusPublish, err.Error())
@@ -199,6 +157,7 @@ func (s *NatsConditionStatusPublisher) Publish(ctx context.Context, serverID str
 		"taskID":            s.conditionID,
 		"lastRev":           s.lastRev,
 		"key":               key,
+		"tsUpdateOnly":      tsUpdateOnly,
 	}).Trace("Condition status published")
 
 	return nil
