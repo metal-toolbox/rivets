@@ -71,7 +71,7 @@ func NewNatsConditionStatusPublisher(
 	}
 
 	// retrieve current key revision if key exists
-	ckey := key(facilityCode, conditionID)
+	ckey := condition.StatusValueKVKey(facilityCode, conditionID)
 	currStatusEntry, errGet := statusKV.Get(ckey)
 	if errGet != nil && !errors.Is(errGet, nats.ErrKeyNotFound) {
 		return nil, errors.Wrap(
@@ -114,7 +114,7 @@ func (s *NatsConditionStatusPublisher) Publish(ctx context.Context, serverID str
 		UpdatedAt: time.Now(),
 	}
 
-	key := key(s.facilityCode, s.conditionID)
+	key := condition.StatusValueKVKey(s.facilityCode, s.conditionID)
 
 	var err error
 	var rev uint64
@@ -303,7 +303,7 @@ func (n *NatsController) NewNatsConditionStatusQueryor() (*NatsConditionStatusQu
 
 // ConditionState queries the NATS KeyValue store to determine the current state of a condition.
 func (p *NatsConditionStatusQueryor) ConditionState(conditionID string) ConditionState {
-	key := key(p.facilityCode, conditionID)
+	key := condition.StatusValueKVKey(p.facilityCode, conditionID)
 	entry, err := p.kv.Get(key)
 	switch err {
 	case nats.ErrKeyNotFound:
