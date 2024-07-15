@@ -25,17 +25,17 @@ func (_m *MockConditionStatusPublisher) EXPECT() *MockConditionStatusPublisher_E
 	return &MockConditionStatusPublisher_Expecter{mock: &_m.Mock}
 }
 
-// Publish provides a mock function with given fields: ctx, serverID, state, status
-func (_m *MockConditionStatusPublisher) Publish(ctx context.Context, serverID string, state condition.State, status json.RawMessage) error {
-	ret := _m.Called(ctx, serverID, state, status)
+// Publish provides a mock function with given fields: ctx, serverID, state, status, tsUpdateOnly
+func (_m *MockConditionStatusPublisher) Publish(ctx context.Context, serverID string, state condition.State, status json.RawMessage, tsUpdateOnly bool) error {
+	ret := _m.Called(ctx, serverID, state, status, tsUpdateOnly)
 
 	if len(ret) == 0 {
 		panic("no return value specified for Publish")
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, condition.State, json.RawMessage) error); ok {
-		r0 = rf(ctx, serverID, state, status)
+	if rf, ok := ret.Get(0).(func(context.Context, string, condition.State, json.RawMessage, bool) error); ok {
+		r0 = rf(ctx, serverID, state, status, tsUpdateOnly)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -53,13 +53,14 @@ type MockConditionStatusPublisher_Publish_Call struct {
 //   - serverID string
 //   - state condition.State
 //   - status json.RawMessage
-func (_e *MockConditionStatusPublisher_Expecter) Publish(ctx interface{}, serverID interface{}, state interface{}, status interface{}) *MockConditionStatusPublisher_Publish_Call {
-	return &MockConditionStatusPublisher_Publish_Call{Call: _e.mock.On("Publish", ctx, serverID, state, status)}
+//   - tsUpdateOnly bool
+func (_e *MockConditionStatusPublisher_Expecter) Publish(ctx interface{}, serverID interface{}, state interface{}, status interface{}, tsUpdateOnly interface{}) *MockConditionStatusPublisher_Publish_Call {
+	return &MockConditionStatusPublisher_Publish_Call{Call: _e.mock.On("Publish", ctx, serverID, state, status, tsUpdateOnly)}
 }
 
-func (_c *MockConditionStatusPublisher_Publish_Call) Run(run func(ctx context.Context, serverID string, state condition.State, status json.RawMessage)) *MockConditionStatusPublisher_Publish_Call {
+func (_c *MockConditionStatusPublisher_Publish_Call) Run(run func(ctx context.Context, serverID string, state condition.State, status json.RawMessage, tsUpdateOnly bool)) *MockConditionStatusPublisher_Publish_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string), args[2].(condition.State), args[3].(json.RawMessage))
+		run(args[0].(context.Context), args[1].(string), args[2].(condition.State), args[3].(json.RawMessage), args[4].(bool))
 	})
 	return _c
 }
@@ -69,40 +70,7 @@ func (_c *MockConditionStatusPublisher_Publish_Call) Return(_a0 error) *MockCond
 	return _c
 }
 
-func (_c *MockConditionStatusPublisher_Publish_Call) RunAndReturn(run func(context.Context, string, condition.State, json.RawMessage) error) *MockConditionStatusPublisher_Publish_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
-// UpdateTimestamp provides a mock function with given fields: ctx
-func (_m *MockConditionStatusPublisher) UpdateTimestamp(ctx context.Context) {
-	_m.Called(ctx)
-}
-
-// MockConditionStatusPublisher_UpdateTimestamp_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'UpdateTimestamp'
-type MockConditionStatusPublisher_UpdateTimestamp_Call struct {
-	*mock.Call
-}
-
-// UpdateTimestamp is a helper method to define mock.On call
-//   - ctx context.Context
-func (_e *MockConditionStatusPublisher_Expecter) UpdateTimestamp(ctx interface{}) *MockConditionStatusPublisher_UpdateTimestamp_Call {
-	return &MockConditionStatusPublisher_UpdateTimestamp_Call{Call: _e.mock.On("UpdateTimestamp", ctx)}
-}
-
-func (_c *MockConditionStatusPublisher_UpdateTimestamp_Call) Run(run func(ctx context.Context)) *MockConditionStatusPublisher_UpdateTimestamp_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context))
-	})
-	return _c
-}
-
-func (_c *MockConditionStatusPublisher_UpdateTimestamp_Call) Return() *MockConditionStatusPublisher_UpdateTimestamp_Call {
-	_c.Call.Return()
-	return _c
-}
-
-func (_c *MockConditionStatusPublisher_UpdateTimestamp_Call) RunAndReturn(run func(context.Context)) *MockConditionStatusPublisher_UpdateTimestamp_Call {
+func (_c *MockConditionStatusPublisher_Publish_Call) RunAndReturn(run func(context.Context, string, condition.State, json.RawMessage, bool) error) *MockConditionStatusPublisher_Publish_Call {
 	_c.Call.Return(run)
 	return _c
 }
