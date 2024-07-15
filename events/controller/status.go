@@ -10,7 +10,6 @@ import (
 	"github.com/nats-io/nats.go"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
-	"go.hollow.sh/toolbox/events/registry"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
@@ -18,6 +17,7 @@ import (
 	"github.com/metal-toolbox/rivets/condition"
 	"github.com/metal-toolbox/rivets/events"
 	"github.com/metal-toolbox/rivets/events/pkg/kv"
+	"github.com/metal-toolbox/rivets/events/registry"
 )
 
 var (
@@ -49,21 +49,30 @@ type NatsConditionStatusPublisher struct {
 // NewNatsConditionStatusPublisher creates a new NatsConditionStatusPublisher for a given condition ID.
 //
 // It initializes a NATS KeyValue store for tracking condition statuses.
-func (n *NatsController) NewNatsConditionStatusPublisher(conditionID string) (*NatsConditionStatusPublisher, error) {
+func NewNatsConditionStatusPublisher(
+	appName,
+	conditionID,
+	facilityCode string,
+	conditionKind condition.Kind,
+	controllerID registry.ControllerID,
+	kvReplicas int,
+	stream *events.NatsJetstream,
+	logger *logrus.Logger,
+) (*NatsConditionStatusPublisher, error) {
 	kvOpts := []kv.Option{
-		kv.WithDescription(fmt.Sprintf("%s condition status tracking", n.natsConfig.AppName)),
+		kv.WithDescription(fmt.Sprintf("%s condition status tracking", appName)),
 		kv.WithTTL(kvTTL),
-		kv.WithReplicas(n.natsConfig.KVReplicationFactor),
+		kv.WithReplicas(kvReplicas),
 	}
 
 	errKV := errors.New("unable to bind to status KV bucket")
-	statusKV, err := kv.CreateOrBindKVBucket(n.stream.(*events.NatsJetstream), string(n.conditionKind), kvOpts...)
+	statusKV, err := kv.CreateOrBindKVBucket(stream, string(conditionKind), kvOpts...)
 	if err != nil {
 		return nil, errors.Wrap(errKV, err.Error())
 	}
 
 	// retrieve current key revision if key exists
-	ckey := key(n.facilityCode, conditionID)
+	ckey := key(facilityCode, conditionID)
 	currStatusEntry, errGet := statusKV.Get(ckey)
 	if errGet != nil && !errors.Is(errGet, nats.ErrKeyNotFound) {
 		return nil, errors.Wrap(
@@ -78,11 +87,11 @@ func (n *NatsController) NewNatsConditionStatusPublisher(conditionID string) (*N
 	}
 
 	return &NatsConditionStatusPublisher{
-		facilityCode: n.facilityCode,
+		facilityCode: facilityCode,
 		conditionID:  conditionID,
-		controllerID: n.ID(),
+		controllerID: controllerID.String(),
 		kv:           statusKV,
-		log:          n.logger,
+		log:          logger,
 		lastRev:      lastRev,
 	}, nil
 }
