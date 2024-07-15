@@ -190,7 +190,7 @@ func TestProcessCondition(t *testing.T) {
 
 				// expect to publish status in these states
 				cStatusPublisher = NewMockConditionStatusPublisher(t)
-				cStatusPublisher.On("Publish", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
+				cStatusPublisher.On("Publish", mock.Anything, mock.Anything, mock.Anything, mock.Anything, false).Return(nil)
 			}
 
 			mockLiveness := NewMockLivenessCheckin(t)
@@ -307,8 +307,10 @@ func TestRunConditionHandlerWithMonitor(t *testing.T) {
 					Return(nil)
 
 				message.On("Ack").Return(nil)
-				publisher.On("UpdateTimestamp", mock.Anything).Return(nil)
-				publisher.On("Publish", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
+				// ts update
+				publisher.On("Publish", mock.Anything, mock.Anything, mock.Anything, mock.Anything, true).Return(nil)
+				// full status update
+				publisher.On("Publish", mock.Anything, mock.Anything, mock.Anything, mock.Anything, false).Return(nil)
 
 				return handler, message, publisher
 			},
@@ -325,7 +327,7 @@ func TestRunConditionHandlerWithMonitor(t *testing.T) {
 					Return(errors.New("barf"))
 
 				message.On("Ack").Return(nil)
-				publisher.On("Publish", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
+				publisher.On("Publish", mock.Anything, mock.Anything, mock.Anything, mock.Anything, false).Return(nil)
 
 				return handler, message, publisher
 			},
@@ -340,7 +342,7 @@ func TestRunConditionHandlerWithMonitor(t *testing.T) {
 				handler := NewMockConditionHandler(t)
 
 				message.On("Nak").Return(nil)
-				publisher.On("Publish", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(errors.New("barf"))
+				publisher.On("Publish", mock.Anything, mock.Anything, mock.Anything, mock.Anything, false).Return(errors.New("barf"))
 
 				return handler, message, publisher
 			},
@@ -358,8 +360,8 @@ func TestRunConditionHandlerWithMonitor(t *testing.T) {
 					Run(func(_ mock.Arguments) { panic("oops") })
 
 				message.On("Ack").Return(nil)
-				publisher.On("Publish", mock.Anything, mock.Anything, condition.Pending, mock.Anything).Return(nil)
-				publisher.On("Publish", mock.Anything, mock.Anything, condition.Failed, mock.Anything).Return(nil)
+				publisher.On("Publish", mock.Anything, mock.Anything, condition.Pending, mock.Anything, false).Return(nil)
+				publisher.On("Publish", mock.Anything, mock.Anything, condition.Failed, mock.Anything, false).Return(nil)
 
 				return handler, message, publisher
 			},
