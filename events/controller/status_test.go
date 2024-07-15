@@ -71,19 +71,26 @@ func TestNewNatsConditionStatusPublisher(t *testing.T) {
 
 	const facilityCode = "fac13"
 	controllerID := registry.GetID("test")
-	mockLiveness := NewMockLivenessCheckin(t)
-	mockLiveness.On("ControllerID").Return(controllerID)
 
 	controller := &NatsController{
 		stream:        evJS,
 		facilityCode:  facilityCode,
 		conditionKind: cond.Kind,
 		logger:        logrus.New(),
-		liveness:      mockLiveness,
 	}
 
 	// test happy case
-	publisher, err := controller.NewNatsConditionStatusPublisher(cond.ID.String())
+	publisher, err := NewNatsConditionStatusPublisher(
+		"test",
+		cond.ID.String(),
+		facilityCode,
+		cond.Kind,
+		controllerID,
+		0,
+		evJS,
+		controller.logger,
+	)
+
 	require.Nil(t, err)
 	require.NotNil(t, publisher, "publisher constructor")
 
@@ -102,7 +109,17 @@ func TestNewNatsConditionStatusPublisher(t *testing.T) {
 	)
 	require.Equal(t, uint64(1), publisher.lastRev)
 
-	publisher, err = controller.NewNatsConditionStatusPublisher(cond.ID.String())
+	publisher, err = NewNatsConditionStatusPublisher(
+		"test",
+		cond.ID.String(),
+		facilityCode,
+		cond.Kind,
+		controllerID,
+		0,
+		evJS,
+		controller.logger,
+	)
+
 	require.Nil(t, err)
 	require.NotNil(t, publisher, "publisher constructor")
 	require.Equal(t, uint64(1), publisher.lastRev)
@@ -132,18 +149,24 @@ func TestPublish(t *testing.T) {
 	const facilityCode = "fac13"
 
 	controllerID := registry.GetID("test")
-	mockLiveness := NewMockLivenessCheckin(t)
-	mockLiveness.On("ControllerID").Return(controllerID)
 
 	controller := &NatsController{
 		stream:        evJS,
 		facilityCode:  facilityCode,
 		conditionKind: cond.Kind,
 		logger:        logrus.New(),
-		liveness:      mockLiveness,
 	}
 
-	publisher, err := controller.NewNatsConditionStatusPublisher(cond.ID.String())
+	publisher, err := NewNatsConditionStatusPublisher(
+		"test",
+		cond.ID.String(),
+		facilityCode,
+		cond.Kind,
+		controllerID,
+		0,
+		evJS,
+		controller.logger,
+	)
 	require.Nil(t, err)
 	require.NotNil(t, publisher, "publisher constructor")
 
