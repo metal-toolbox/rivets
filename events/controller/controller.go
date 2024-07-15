@@ -478,6 +478,7 @@ func (n *NatsController) runConditionHandlerWithMonitor(ctx context.Context, con
 		cond.Target.String(),
 		condition.Pending,
 		cond.Status,
+		false,
 	); err != nil {
 		n.logger.WithError(err).WithFields(logrus.Fields{
 			"condition.id": cond.ID.String(),
@@ -507,7 +508,17 @@ func (n *NatsController) runConditionHandlerWithMonitor(ctx context.Context, con
 		for {
 			select {
 			case <-ticker.C:
-				conditionStatusPublisher.UpdateTimestamp(ctx)
+				if errUpdate := conditionStatusPublisher.Publish(
+					ctx,
+					cond.Target.String(),
+					condition.Active,  // field ignored in a TS update publish
+					json.RawMessage{}, // field ignored in a TS update publish
+					true,              // Just update TS
+				); errUpdate != nil {
+					n.logger.WithError(errUpdate).WithFields(logrus.Fields{
+						"condition.id": cond.ID.String(),
+					}).Warn("status timestamp update publish error")
+				}
 			case <-doneCh:
 				break Loop
 			}
@@ -538,12 +549,17 @@ func (n *NatsController) runConditionHandlerWithMonitor(ctx context.Context, con
 			// publish failed state, status
 			//
 			// Publish logs error internally
-			_ = conditionStatusPublisher.Publish(
+			if errUpdate := conditionStatusPublisher.Publish(
 				ctx,
 				cond.Target.String(),
 				condition.Failed,
 				statusRecord.MustMarshal(),
-			)
+				false,
+			); errUpdate != nil {
+				n.logger.WithError(errUpdate).WithFields(logrus.Fields{
+					"condition.id": cond.ID.String(),
+				}).Warn("status update publish error")
+			}
 		}
 	}() // nolint:errcheck // nope
 
