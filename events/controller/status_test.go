@@ -102,7 +102,13 @@ func TestNewNatsConditionStatusPublisher(t *testing.T) {
 	serverID := uuid.New()
 	require.NotPanics(t,
 		func() {
-			errP := publisher.Publish(context.Background(), serverID.String(), condition.Pending, []byte(`{"pending...": "true"}`))
+			errP := publisher.Publish(
+				context.Background(),
+				serverID.String(),
+				condition.Pending,
+				[]byte(`{"pending...": "true"}`),
+				false,
+			)
 			require.NoError(t, errP)
 		},
 		"publish 1",
@@ -126,7 +132,13 @@ func TestNewNatsConditionStatusPublisher(t *testing.T) {
 
 	require.NotPanics(t,
 		func() {
-			errP := publisher.Publish(context.Background(), serverID.String(), condition.Active, []byte(`{"some work...": "true"}`))
+			errP := publisher.Publish(
+				context.Background(),
+				serverID.String(),
+				condition.Active,
+				[]byte(`{"some work...": "true"}`),
+				false,
+			)
 			require.NoError(t, errP)
 		},
 		"publish 2",
@@ -178,7 +190,12 @@ func TestPublish(t *testing.T) {
 	// publish pending status
 	require.NotPanics(t,
 		func() {
-			errP := publisher.Publish(context.Background(), serverID.String(), condition.Pending, []byte(`{"pending...": "true"}`))
+			errP := publisher.Publish(
+				context.Background(), serverID.String(),
+				condition.Pending,
+				[]byte(`{"pending...": "true"}`),
+				false,
+			)
 			require.NoError(t, errP)
 		},
 		"publish pending",
@@ -200,7 +217,13 @@ func TestPublish(t *testing.T) {
 	// publish active status
 	require.NotPanics(t,
 		func() {
-			errP := publisher.Publish(context.Background(), serverID.String(), condition.Active, []byte(`{"active...": "true"}`))
+			errP := publisher.Publish(
+				context.Background(),
+				serverID.String(),
+				condition.Active,
+				[]byte(`{"active...": "true"}`),
+				false,
+			)
 			require.NoError(t, errP)
 
 		},
