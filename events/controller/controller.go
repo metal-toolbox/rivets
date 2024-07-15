@@ -329,7 +329,16 @@ func (n *NatsController) processConditionFromEvent(ctx context.Context, msg even
 	// extract parent trace context from the event if any.
 	ctx = msg.ExtractOtelTraceContext(ctx)
 
-	conditionStatusPublisher, err := n.NewNatsConditionStatusPublisher(cond.ID.String())
+	conditionStatusPublisher, err := NewNatsConditionStatusPublisher(
+		"test",
+		cond.ID.String(),
+		n.facilityCode,
+		cond.Kind,
+		n.liveness.ControllerID(),
+		0,
+		n.stream.(*events.NatsJetstream),
+		n.logger,
+	)
 	if err != nil {
 		n.logger.WithField("conditionID", cond.ID.String()).Warn("failed to initialize publisher")
 		eventAcknowleger.nak()
