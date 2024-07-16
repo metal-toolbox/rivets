@@ -41,7 +41,10 @@ type Stream interface {
 	// Publish publishes the message to the message broker.
 	//
 	// rollupSubject when set to true will cause any previous messages with the same subject to be overwritten by this new msg.
-	Publish(ctx context.Context, subject string, msg []byte, rollupSubject bool) error
+	Publish(ctx context.Context, subject string, msg []byte) error
+
+	// PublishOverwrite publishes the message to the message broker overwriting any existing message with that subject
+	PublishOverwrite(ctx context.Context, subject string, msg []byte) error
 
 	// Subscribe subscribes to one or more subjects on the stream returning a message channel for subscribers to read from.
 	Subscribe(ctx context.Context) (MsgCh, error)
