@@ -3,6 +3,7 @@ package controller
 import (
 	"context"
 	"encoding/json"
+	"io"
 	"os"
 	"testing"
 	"time"
@@ -14,8 +15,11 @@ import (
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	orc "github.com/metal-toolbox/conditionorc/pkg/api/v1/orchestrator/client"
+	orctypes "github.com/metal-toolbox/conditionorc/pkg/api/v1/orchestrator/types"
 	"github.com/metal-toolbox/rivets/condition"
 	"github.com/metal-toolbox/rivets/events"
 	"github.com/metal-toolbox/rivets/events/registry"
@@ -80,7 +84,7 @@ func TestNewNatsConditionStatusPublisher(t *testing.T) {
 	}
 
 	// test happy case
-	publisher, err := NewNatsConditionStatusPublisher(
+	p, err := NewNatsConditionStatusPublisher(
 		"test",
 		cond.ID.String(),
 		facilityCode,
@@ -90,6 +94,9 @@ func TestNewNatsConditionStatusPublisher(t *testing.T) {
 		evJS,
 		controller.logger,
 	)
+
+	publisher, ok := p.(*NatsConditionStatusPublisher)
+	assert.True(t, ok)
 
 	require.Nil(t, err)
 	require.NotNil(t, publisher, "publisher constructor")
@@ -115,7 +122,7 @@ func TestNewNatsConditionStatusPublisher(t *testing.T) {
 	)
 	require.Equal(t, uint64(1), publisher.lastRev)
 
-	publisher, err = NewNatsConditionStatusPublisher(
+	p, err = NewNatsConditionStatusPublisher(
 		"test",
 		cond.ID.String(),
 		facilityCode,
@@ -125,6 +132,9 @@ func TestNewNatsConditionStatusPublisher(t *testing.T) {
 		evJS,
 		controller.logger,
 	)
+
+	publisher, ok = p.(*NatsConditionStatusPublisher)
+	assert.True(t, ok)
 
 	require.Nil(t, err)
 	require.NotNil(t, publisher, "publisher constructor")
@@ -169,7 +179,7 @@ func TestPublish(t *testing.T) {
 		logger:        logrus.New(),
 	}
 
-	publisher, err := NewNatsConditionStatusPublisher(
+	p, err := NewNatsConditionStatusPublisher(
 		"test",
 		cond.ID.String(),
 		facilityCode,
@@ -179,6 +189,10 @@ func TestPublish(t *testing.T) {
 		evJS,
 		controller.logger,
 	)
+
+	publisher, ok := p.(*NatsConditionStatusPublisher)
+	assert.True(t, ok)
+
 	require.Nil(t, err)
 	require.NotNil(t, publisher, "publisher constructor")
 
@@ -496,6 +510,129 @@ func TestStatusValueUpdate(t *testing.T) {
 				assert.Equal(t, tt.expectedSV.State, gotSV.State)
 				assert.JSONEq(t, string(tt.expectedSV.Status), string(gotSV.Status))
 				assert.WithinDuration(t, tt.expectedSV.UpdatedAt, gotSV.UpdatedAt, time.Second)
+			}
+		})
+	}
+}
+
+func TestHTTPConditionStatusPublisher_Publish(t *testing.T) {
+	logger := logrus.New()
+	logger.SetOutput(io.Discard)
+
+	serverID := uuid.New()
+	conditionID := uuid.New()
+	conditionKind := condition.FirmwareInstall
+	controllerID := registry.GetID("test-controller")
+
+	publisher := &HTTPConditionStatusPublisher{
+		conditionID:   conditionID,
+		conditionKind: conditionKind,
+		serverID:      serverID,
+		controllerID:  controllerID,
+		logger:        logger,
+	}
+
+	tests := []struct {
+		name          string
+		state         condition.State
+		status        json.RawMessage
+		tsUpdateOnly  bool
+		mockSetup     func(m *orc.MockQueryor)
+		expectedError string
+	}{
+		{
+			name:         "Successful publish",
+			state:        condition.Active,
+			status:       json.RawMessage(`{"message":"In progress"}`),
+			tsUpdateOnly: false,
+			mockSetup: func(m *orc.MockQueryor) {
+				m.On("ConditionStatusUpdate",
+					mock.Anything,
+					conditionKind,
+					serverID,
+					conditionID,
+					controllerID,
+					mock.MatchedBy(func(sv *condition.StatusValue) bool {
+						assert.Equal(t, sv.State, string(condition.Active))
+						assert.Equal(t, sv.Target, serverID.String())
+						assert.Equal(t, sv.WorkerID, controllerID.String())
+						assert.WithinDuration(t, time.Now(), sv.UpdatedAt, time.Second)
+
+						return true
+					}),
+					false,
+				).Return(&orctypes.ServerResponse{StatusCode: 200}, nil)
+			},
+		},
+		{
+			name:         "Successful timestamp-only update",
+			state:        condition.Active,
+			status:       json.RawMessage(`{"message":"In progress"}`),
+			tsUpdateOnly: true,
+			mockSetup: func(m *orc.MockQueryor) {
+				m.On("ConditionStatusUpdate",
+					mock.Anything,
+					conditionKind,
+					serverID,
+					conditionID,
+					controllerID,
+					mock.IsType(&condition.StatusValue{}),
+					true,
+				).Return(&orctypes.ServerResponse{StatusCode: 200}, nil)
+			},
+		},
+		{
+			name:         "Publish error",
+			state:        condition.Failed,
+			status:       json.RawMessage(`{"error":"Something went wrong"}`),
+			tsUpdateOnly: false,
+			mockSetup: func(m *orc.MockQueryor) {
+				m.On("ConditionStatusUpdate",
+					mock.Anything,
+					conditionKind,
+					serverID,
+					conditionID,
+					controllerID,
+					mock.IsType(&condition.StatusValue{}),
+					false,
+				).Return(nil, errors.New("Publish error"))
+			},
+			expectedError: "Publish error",
+		},
+		{
+			name:         "Non-200 status code",
+			state:        condition.Succeeded,
+			status:       json.RawMessage(`{"message":"Completed successfully"}`),
+			tsUpdateOnly: false,
+			mockSetup: func(m *orc.MockQueryor) {
+				m.On("ConditionStatusUpdate",
+					mock.Anything,
+					conditionKind,
+					serverID,
+					conditionID,
+					controllerID,
+					mock.IsType(&condition.StatusValue{}),
+					false,
+				).Return(&orctypes.ServerResponse{StatusCode: 400}, nil)
+			},
+			expectedError: "non 200 response code",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mockQueryor := new(orc.MockQueryor)
+			tt.mockSetup(mockQueryor)
+			publisher.orcQueryor = mockQueryor
+
+			ctx := context.Background()
+			err := publisher.Publish(ctx, serverID.String(), tt.state, tt.status, tt.tsUpdateOnly)
+
+			if tt.expectedError != "" {
+				assert.Error(t, err)
+				assert.Contains(t, err.Error(), tt.expectedError)
+			} else {
+				assert.NoError(t, err)
 			}
 		})
 	}
