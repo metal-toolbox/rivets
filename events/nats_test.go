@@ -83,7 +83,7 @@ func TestPublishAndSubscribe(t *testing.T) {
 	require.NoError(t, err)
 
 	payload := []byte("test data")
-	require.NoError(t, njs.Publish(context.TODO(), "test", payload, false))
+	require.NoError(t, njs.Publish(context.TODO(), "test", payload))
 
 	msgs, err := njs.PullMsg(context.TODO(), 1)
 	require.NoError(t, err)
@@ -129,9 +129,9 @@ func TestPublishAndSubscribe_WithRollup(t *testing.T) {
 	require.NoError(t, err)
 
 	payload := []byte("test data")
-	require.NoError(t, njs.Publish(context.TODO(), "test", payload, true))
+	require.NoError(t, njs.PublishOverwrite(context.TODO(), "test", payload))
 	payload2 := []byte("rollup")
-	require.NoError(t, njs.Publish(context.TODO(), "test", payload2, true))
+	require.NoError(t, njs.PublishOverwrite(context.TODO(), "test", payload2))
 
 	msgs, err := njs.PullMsg(context.TODO(), 1)
 	require.NoError(t, err)

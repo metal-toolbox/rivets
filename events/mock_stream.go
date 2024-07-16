@@ -111,17 +111,17 @@ func (_c *MockStream_Open_Call) RunAndReturn(run func() error) *MockStream_Open_
 	return _c
 }
 
-// Publish provides a mock function with given fields: ctx, subject, msg, rollupSubject
-func (_m *MockStream) Publish(ctx context.Context, subject string, msg []byte, rollupSubject bool) error {
-	ret := _m.Called(ctx, subject, msg, rollupSubject)
+// Publish provides a mock function with given fields: ctx, subject, msg
+func (_m *MockStream) Publish(ctx context.Context, subject string, msg []byte) error {
+	ret := _m.Called(ctx, subject, msg)
 
 	if len(ret) == 0 {
 		panic("no return value specified for Publish")
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, []byte, bool) error); ok {
-		r0 = rf(ctx, subject, msg, rollupSubject)
+	if rf, ok := ret.Get(0).(func(context.Context, string, []byte) error); ok {
+		r0 = rf(ctx, subject, msg)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -138,14 +138,13 @@ type MockStream_Publish_Call struct {
 //   - ctx context.Context
 //   - subject string
 //   - msg []byte
-//   - rollupSubject bool
-func (_e *MockStream_Expecter) Publish(ctx interface{}, subject interface{}, msg interface{}, rollupSubject interface{}) *MockStream_Publish_Call {
-	return &MockStream_Publish_Call{Call: _e.mock.On("Publish", ctx, subject, msg, rollupSubject)}
+func (_e *MockStream_Expecter) Publish(ctx interface{}, subject interface{}, msg interface{}) *MockStream_Publish_Call {
+	return &MockStream_Publish_Call{Call: _e.mock.On("Publish", ctx, subject, msg)}
 }
 
-func (_c *MockStream_Publish_Call) Run(run func(ctx context.Context, subject string, msg []byte, rollupSubject bool)) *MockStream_Publish_Call {
+func (_c *MockStream_Publish_Call) Run(run func(ctx context.Context, subject string, msg []byte)) *MockStream_Publish_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string), args[2].([]byte), args[3].(bool))
+		run(args[0].(context.Context), args[1].(string), args[2].([]byte))
 	})
 	return _c
 }
@@ -155,7 +154,55 @@ func (_c *MockStream_Publish_Call) Return(_a0 error) *MockStream_Publish_Call {
 	return _c
 }
 
-func (_c *MockStream_Publish_Call) RunAndReturn(run func(context.Context, string, []byte, bool) error) *MockStream_Publish_Call {
+func (_c *MockStream_Publish_Call) RunAndReturn(run func(context.Context, string, []byte) error) *MockStream_Publish_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// PublishOverwrite provides a mock function with given fields: ctx, subject, msg
+func (_m *MockStream) PublishOverwrite(ctx context.Context, subject string, msg []byte) error {
+	ret := _m.Called(ctx, subject, msg)
+
+	if len(ret) == 0 {
+		panic("no return value specified for PublishOverwrite")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, []byte) error); ok {
+		r0 = rf(ctx, subject, msg)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MockStream_PublishOverwrite_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'PublishOverwrite'
+type MockStream_PublishOverwrite_Call struct {
+	*mock.Call
+}
+
+// PublishOverwrite is a helper method to define mock.On call
+//   - ctx context.Context
+//   - subject string
+//   - msg []byte
+func (_e *MockStream_Expecter) PublishOverwrite(ctx interface{}, subject interface{}, msg interface{}) *MockStream_PublishOverwrite_Call {
+	return &MockStream_PublishOverwrite_Call{Call: _e.mock.On("PublishOverwrite", ctx, subject, msg)}
+}
+
+func (_c *MockStream_PublishOverwrite_Call) Run(run func(ctx context.Context, subject string, msg []byte)) *MockStream_PublishOverwrite_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string), args[2].([]byte))
+	})
+	return _c
+}
+
+func (_c *MockStream_PublishOverwrite_Call) Return(_a0 error) *MockStream_PublishOverwrite_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockStream_PublishOverwrite_Call) RunAndReturn(run func(context.Context, string, []byte) error) *MockStream_PublishOverwrite_Call {
 	_c.Call.Return(run)
 	return _c
 }
