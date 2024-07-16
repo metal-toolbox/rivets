@@ -8,6 +8,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	orc "github.com/metal-toolbox/conditionorc/pkg/api/v1/orchestrator/client"
+	orctypes "github.com/metal-toolbox/conditionorc/pkg/api/v1/orchestrator/types"
 	"github.com/metal-toolbox/rivets/condition"
 	"github.com/metal-toolbox/rivets/events"
 	"github.com/metal-toolbox/rivets/events/registry"
@@ -17,6 +19,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
 
@@ -592,6 +595,231 @@ func TestNatsConditionTaskRepository_Publish(t *testing.T) {
 				} else {
 					assert.Equal(t, tt.task.State, publishedTask.State)
 				}
+			}
+		})
+	}
+}
+
+func TestHTTPTaskRepository_Publish(t *testing.T) {
+	logger := logrus.New()
+	logger.SetOutput(io.Discard)
+
+	serverID := uuid.New()
+	conditionID := uuid.New()
+	conditionKind := condition.FirmwareInstall
+
+	repo := &HTTPTaskRepository{
+		conditionID:   conditionID,
+		conditionKind: conditionKind,
+		serverID:      serverID,
+		logger:        logger,
+	}
+
+	tests := []struct {
+		name          string
+		task          *condition.Task[any, any]
+		tsUpdateOnly  bool
+		mockSetup     func(m *orc.MockQueryor)
+		expectedError string
+	}{
+		{
+			name: "Successful publish",
+			task: &condition.Task[any, any]{
+				ID:    conditionID,
+				State: condition.Active,
+			},
+			tsUpdateOnly: false,
+			mockSetup: func(m *orc.MockQueryor) {
+				m.On("ConditionTaskPublish",
+					mock.Anything,
+					conditionKind,
+					serverID,
+					conditionID,
+					mock.MatchedBy(
+						func(t *condition.Task[any, any]) bool {
+							return t.ID == conditionID && t.State == condition.Active
+						},
+					),
+					false,
+				).Return(&orctypes.ServerResponse{StatusCode: 200}, nil)
+			},
+		},
+		{
+			name: "Successful timestamp-only update",
+			task: &condition.Task[any, any]{
+				ID:    conditionID,
+				State: condition.Active,
+			},
+			tsUpdateOnly: true,
+			mockSetup: func(m *orc.MockQueryor) {
+				m.On("ConditionTaskPublish",
+					mock.Anything,
+					conditionKind,
+					serverID,
+					conditionID,
+					mock.IsType(&condition.Task[any, any]{}),
+					true,
+				).Return(&orctypes.ServerResponse{StatusCode: 200}, nil)
+			},
+		},
+		{
+			name: "Publish error",
+			task: &condition.Task[any, any]{
+				ID:    conditionID,
+				State: condition.Active,
+			},
+			tsUpdateOnly: false,
+			mockSetup: func(m *orc.MockQueryor) {
+				m.On("ConditionTaskPublish",
+					mock.Anything,
+					conditionKind,
+					serverID,
+					conditionID,
+					mock.IsType(&condition.Task[any, any]{}),
+					false,
+				).Return(nil, errors.New("Publish error"))
+			},
+			expectedError: "Publish error",
+		},
+		{
+			name: "Non-200 status code",
+			task: &condition.Task[any, any]{
+				ID:    conditionID,
+				State: condition.Active,
+			},
+			tsUpdateOnly: false,
+			mockSetup: func(m *orc.MockQueryor) {
+				m.On("ConditionTaskPublish",
+					mock.Anything,
+					conditionKind,
+					serverID,
+					conditionID,
+					mock.IsType(&condition.Task[any, any]{}),
+					false,
+				).Return(&orctypes.ServerResponse{StatusCode: 400}, nil)
+			},
+			expectedError: "non 200 response code",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mockQueryor := new(orc.MockQueryor)
+			tt.mockSetup(mockQueryor)
+			repo.orcQueryor = mockQueryor
+
+			err := repo.Publish(context.Background(), tt.task, tt.tsUpdateOnly)
+
+			if tt.expectedError != "" {
+				assert.Error(t, err)
+				assert.Contains(t, err.Error(), tt.expectedError)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestHTTPTaskRepository_Query(t *testing.T) {
+	logger := logrus.New()
+	logger.SetOutput(io.Discard)
+
+	serverID := uuid.New()
+	conditionID := uuid.New()
+	conditionKind := condition.FirmwareInstall
+
+	repo := &HTTPTaskRepository{
+		conditionID:   conditionID,
+		conditionKind: conditionKind,
+		serverID:      serverID,
+		logger:        logger,
+	}
+
+	tests := []struct {
+		name          string
+		mockSetup     func(m *orc.MockQueryor)
+		expectedTask  *condition.Task[any, any]
+		expectedError string
+	}{
+		{
+			name: "Successful query",
+			mockSetup: func(m *orc.MockQueryor) {
+				expectedTask := &condition.Task[any, any]{
+					ID:    conditionID,
+					State: condition.Active,
+				}
+				m.On("ConditionTaskQuery",
+					mock.Anything,
+					conditionKind,
+					serverID,
+				).Return(&orctypes.ServerResponse{
+					StatusCode: 200,
+					Task:       expectedTask,
+				}, nil)
+			},
+			expectedTask: &condition.Task[any, any]{
+				ID:    conditionID,
+				State: condition.Active,
+			},
+		},
+		{
+			name: "Query error",
+			mockSetup: func(m *orc.MockQueryor) {
+				m.On("ConditionTaskQuery",
+					mock.Anything,
+					conditionKind,
+					serverID,
+				).Return(nil, errors.New("Task query error"))
+			},
+			expectedError: "Task query error",
+		},
+		{
+			name: "No task in response",
+			mockSetup: func(m *orc.MockQueryor) {
+				m.On("ConditionTaskQuery",
+					mock.Anything,
+					conditionKind,
+					serverID,
+				).Return(&orctypes.ServerResponse{
+					StatusCode: 200,
+					Task:       nil,
+				}, nil)
+			},
+			expectedError: "no Task object in response",
+		},
+		{
+			name: "Non-200 status code",
+			mockSetup: func(m *orc.MockQueryor) {
+				m.On("ConditionTaskQuery",
+					mock.Anything,
+					conditionKind,
+					serverID,
+				).Return(&orctypes.ServerResponse{
+					StatusCode: 404,
+					Message:    "Not Found",
+				}, nil)
+			},
+			expectedError: "non 200 response code",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mockQueryor := new(orc.MockQueryor)
+			tt.mockSetup(mockQueryor)
+			repo.orcQueryor = mockQueryor
+
+			task, err := repo.Query(context.Background())
+
+			if tt.expectedError != "" {
+				assert.Error(t, err)
+				assert.Contains(t, err.Error(), tt.expectedError)
+				assert.Nil(t, task)
+			} else {
+				assert.NoError(t, err)
+				assert.NotNil(t, task)
+				assert.Equal(t, tt.expectedTask.ID, task.ID)
+				assert.Equal(t, tt.expectedTask.State, task.State)
 			}
 		})
 	}
