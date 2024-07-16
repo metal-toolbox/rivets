@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/metal-toolbox/rivets/condition"
 	"github.com/metal-toolbox/rivets/events"
 	"github.com/metal-toolbox/rivets/events/pkg/kv"
@@ -16,6 +17,8 @@ import (
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
+
+	orc "github.com/metal-toolbox/conditionorc/pkg/api/v1/orchestrator/client"
 )
 
 var (
@@ -279,4 +282,97 @@ func (n *NatsConditionTaskRepository) Query(ctx context.Context) (*condition.Tas
 	}
 
 	return task, nil
+}
+
+// HTTPTaskRepository implements the ConditionTaskRepository to Publish and Query Task information from NATS over HTTP.
+type HTTPTaskRepository struct {
+	logger        *logrus.Logger
+	orcQueryor    orc.Queryor
+	conditionKind condition.Kind
+	conditionID   uuid.UUID
+	serverID      uuid.UUID
+}
+
+func NewHTTPTaskRepository(
+	serverID,
+	conditionID uuid.UUID,
+	conditionKind condition.Kind,
+	orcQueryor orc.Queryor,
+	logger *logrus.Logger,
+) ConditionTaskRepository {
+	return &HTTPTaskRepository{
+		orcQueryor:    orcQueryor,
+		conditionID:   conditionID,
+		conditionKind: conditionKind,
+		serverID:      serverID,
+		logger:        logger,
+	}
+}
+
+// Publish implements the ConditionTaskRepository interface to record Task information in the Task KV.
+func (h *HTTPTaskRepository) Publish(ctx context.Context, task *condition.Task[any, any], tsUpdateOnly bool) error {
+	_, span := otel.Tracer(pkgName).Start(
+		ctx,
+		"controller.task_http.Publish",
+		trace.WithSpanKind(trace.SpanKindConsumer),
+	)
+	defer span.End()
+
+	resp, err := h.orcQueryor.ConditionTaskPublish(ctx, h.conditionKind, h.serverID, h.conditionID, task, tsUpdateOnly)
+	if err != nil {
+		h.logger.WithError(err).Error("Task update error")
+		return errors.Wrap(errTaskPublish, err.Error())
+	}
+
+	if resp.StatusCode != 200 {
+		// nolint:goerr113 // I'd like to keep the error definition close to where its in use.
+		errNon200 := fmt.Errorf("non 200 response code returned: %d", resp.StatusCode)
+		h.logger.WithError(errTaskPublish).Error(errNon200)
+		return errors.Wrap(errTaskPublish, errNon200.Error())
+	}
+
+	h.logger.WithFields(
+		logrus.Fields{
+			"status": resp.StatusCode,
+		},
+	).Trace("Task update published successfully")
+
+	return nil
+}
+
+// Query implements the ConditionTaskRepository interface to retrieve Task information from the Task KV.
+func (h *HTTPTaskRepository) Query(ctx context.Context) (*condition.Task[any, any], error) {
+	errNoTask := errors.New("no Task object in response")
+
+	_, span := otel.Tracer(pkgName).Start(
+		ctx,
+		"controller.task_http.Query",
+		trace.WithSpanKind(trace.SpanKindConsumer),
+	)
+	defer span.End()
+
+	resp, err := h.orcQueryor.ConditionTaskQuery(ctx, h.conditionKind, h.serverID)
+	if err != nil {
+		h.logger.WithError(err).Error("Task query error")
+		return nil, errors.Wrap(errTaskQuery, err.Error())
+	}
+
+	if resp.StatusCode != 200 {
+		// nolint:goerr113 // I'd like to keep the error definition close to where its in use.
+		errNon200 := fmt.Errorf("non 200 response code returned: %d", resp.StatusCode)
+		h.logger.WithError(errTaskQuery).Error(errNon200)
+		return nil, errors.Wrap(errTaskQuery, errNon200.Error())
+	}
+
+	h.logger.WithFields(
+		logrus.Fields{
+			"status": resp.StatusCode,
+		},
+	).Trace("Task queried successfully")
+
+	if resp.Task == nil {
+		return nil, errNoTask
+	}
+
+	return resp.Task, nil
 }
