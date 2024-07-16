@@ -7,6 +7,7 @@ import (
 	"reflect"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/nats-io/nats.go"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -18,6 +19,8 @@ import (
 	"github.com/metal-toolbox/rivets/events"
 	"github.com/metal-toolbox/rivets/events/pkg/kv"
 	"github.com/metal-toolbox/rivets/events/registry"
+
+	orc "github.com/metal-toolbox/conditionorc/pkg/api/v1/orchestrator/client"
 )
 
 var (
@@ -57,7 +60,7 @@ func NewNatsConditionStatusPublisher(
 	kvReplicas int,
 	stream *events.NatsJetstream,
 	logger *logrus.Logger,
-) (*NatsConditionStatusPublisher, error) {
+) (ConditionStatusPublisher, error) {
 	kvOpts := []kv.Option{
 		kv.WithDescription(fmt.Sprintf("%s condition status tracking", appName)),
 		kv.WithTTL(kvTTL),
@@ -449,4 +452,72 @@ func (p *natsEventStatusAcknowleger) nak() {
 	}
 
 	p.logger.Trace("event nak successful")
+}
+
+// HTTPConditionStatusPublisher implements the StatusPublisher interface to publish condition status updates over HTTP to NATS.
+type HTTPConditionStatusPublisher struct {
+	logger        *logrus.Logger
+	orcQueryor    orc.Queryor
+	conditionKind condition.Kind
+	conditionID   uuid.UUID
+	serverID      uuid.UUID
+	controllerID  registry.ControllerID
+}
+
+func NewHTTPConditionStatusPublisher(
+	serverID,
+	conditionID uuid.UUID,
+	conditionKind condition.Kind,
+	controllerID registry.ControllerID,
+	orcQueryor orc.Queryor,
+	logger *logrus.Logger,
+) ConditionStatusPublisher {
+	return &HTTPConditionStatusPublisher{
+		orcQueryor:    orcQueryor,
+		conditionID:   conditionID,
+		conditionKind: conditionKind,
+		serverID:      serverID,
+		controllerID:  controllerID,
+		logger:        logger,
+	}
+}
+
+func (s *HTTPConditionStatusPublisher) Publish(ctx context.Context, serverID string, state condition.State, status json.RawMessage, tsUpdateOnly bool) error {
+	_, span := otel.Tracer(pkgName).Start(
+		ctx,
+		"controller.status_http.Publish",
+		trace.WithSpanKind(trace.SpanKindConsumer),
+	)
+	defer span.End()
+
+	sv := &condition.StatusValue{
+		WorkerID:  s.controllerID.String(),
+		Target:    serverID,
+		TraceID:   trace.SpanFromContext(ctx).SpanContext().TraceID().String(),
+		SpanID:    trace.SpanFromContext(ctx).SpanContext().SpanID().String(),
+		State:     string(state),
+		Status:    status,
+		UpdatedAt: time.Now(),
+	}
+
+	resp, err := s.orcQueryor.ConditionStatusUpdate(ctx, s.conditionKind, s.serverID, s.conditionID, s.controllerID, sv, tsUpdateOnly)
+	if err != nil {
+		s.logger.WithError(err).Error("condition status update error")
+		return err
+	}
+
+	if resp.StatusCode != 200 {
+		// nolint:goerr113 // I'd like to keep the error definition close to where its in use.
+		errNon200 := fmt.Errorf("non 200 response code returned: %d", resp.StatusCode)
+		s.logger.Error(errNon200)
+		return errNon200
+	}
+
+	s.logger.WithFields(
+		logrus.Fields{
+			"status": resp.StatusCode,
+		},
+	).Trace("condition status update published successfully")
+
+	return nil
 }
