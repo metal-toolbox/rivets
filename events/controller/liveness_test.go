@@ -15,7 +15,12 @@ import (
 
 func TestStartLivenessCheckin(t *testing.T) {
 	// test for no leaked go routines
-	defer goleak.VerifyNone(t)
+	defer goleak.VerifyNone(t, []goleak.Option{
+		// Ignore can be removed if this ever gets fixed,
+		//
+		// https://github.com/census-instrumentation/opencensus-go/issues/1191
+		goleak.IgnoreTopFunction("go.opencensus.io/stats/view.(*worker).start"),
+	}...)
 
 	srv := startJetStreamServer(t)
 	defer shutdownJetStream(t, srv)
