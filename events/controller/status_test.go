@@ -615,7 +615,7 @@ func TestHTTPConditionStatusPublisher_Publish(t *testing.T) {
 					false,
 				).Return(&orctypes.ServerResponse{StatusCode: 400}, nil)
 			},
-			expectedError: "non 200 response code",
+			expectedError: "API Query returned error, status code: 400: condition status publish error",
 		},
 	}
 

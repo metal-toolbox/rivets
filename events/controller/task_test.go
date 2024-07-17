@@ -698,7 +698,7 @@ func TestHTTPTaskRepository_Publish(t *testing.T) {
 					false,
 				).Return(&orctypes.ServerResponse{StatusCode: 400}, nil)
 			},
-			expectedError: "non 200 response code",
+			expectedError: "API Query returned error, status code: 400: task publish error",
 		},
 	}
 
@@ -799,7 +799,7 @@ func TestHTTPTaskRepository_Query(t *testing.T) {
 					Message:    "Not Found",
 				}, nil)
 			},
-			expectedError: "non 200 response code",
+			expectedError: "API Query returned error, status code: 404, msg: Not Found: task query error",
 		},
 	}
 
