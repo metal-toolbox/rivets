@@ -325,10 +325,9 @@ func (h *HTTPTaskRepository) Publish(ctx context.Context, task *condition.Task[a
 	}
 
 	if resp.StatusCode != 200 {
-		// nolint:goerr113 // I'd like to keep the error definition close to where its in use.
-		errNon200 := fmt.Errorf("non 200 response code returned: %d", resp.StatusCode)
-		h.logger.WithError(errTaskPublish).Error(errNon200)
-		return errors.Wrap(errTaskPublish, errNon200.Error())
+		err := newQueryError(resp.StatusCode, resp.Message)
+		h.logger.WithError(errTaskPublish).Error(err)
+		return errors.Wrap(errTaskPublish, err.Error())
 	}
 
 	h.logger.WithFields(
@@ -358,10 +357,9 @@ func (h *HTTPTaskRepository) Query(ctx context.Context) (*condition.Task[any, an
 	}
 
 	if resp.StatusCode != 200 {
-		// nolint:goerr113 // I'd like to keep the error definition close to where its in use.
-		errNon200 := fmt.Errorf("non 200 response code returned: %d", resp.StatusCode)
-		h.logger.WithError(errTaskQuery).Error(errNon200)
-		return nil, errors.Wrap(errTaskQuery, errNon200.Error())
+		err := newQueryError(resp.StatusCode, resp.Message)
+		h.logger.WithError(errTaskQuery).Error(err)
+		return nil, errors.Wrap(errTaskQuery, err.Error())
 	}
 
 	h.logger.WithFields(

@@ -507,10 +507,9 @@ func (s *HTTPConditionStatusPublisher) Publish(ctx context.Context, serverID str
 	}
 
 	if resp.StatusCode != 200 {
-		// nolint:goerr113 // I'd like to keep the error definition close to where its in use.
-		errNon200 := fmt.Errorf("non 200 response code returned: %d", resp.StatusCode)
-		s.logger.Error(errNon200)
-		return errNon200
+		err := newQueryError(resp.StatusCode, resp.Message)
+		s.logger.WithError(errStatusPublish).Error(err)
+		return errors.Wrap(errStatusPublish, err.Error())
 	}
 
 	s.logger.WithFields(
