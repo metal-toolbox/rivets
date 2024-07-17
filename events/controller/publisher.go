@@ -2,7 +2,6 @@ package controller
 
 import (
 	"context"
-	"time"
 
 	"github.com/google/uuid"
 	"github.com/metal-toolbox/rivets/condition"
@@ -63,10 +62,6 @@ func (p *PublisherHTTP) Publish(ctx context.Context, task *condition.Task[any, a
 	if err != nil {
 		p.logger.WithError(err).Error("Status Value publish error")
 		return err
-	}
-
-	if tsUpdate {
-		task.UpdatedAt = time.Now()
 	}
 
 	err = p.taskRepository.Publish(ctx, task, tsUpdate)
