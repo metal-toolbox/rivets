@@ -3,6 +3,7 @@ package controller
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"os"
 	"runtime/debug"
 	"sync"
@@ -357,13 +358,79 @@ func conditionFromEvent(e events.Message) (*condition.Condition, error) {
 	return cond, nil
 }
 
+func (n *NatsController) stateFinalized(
+	ctx context.Context,
+	cond *condition.Condition,
+	conditionStatusQueryor ConditionStatusQueryor,
+	eventAcknowleger eventStatusAcknowleger, // the NATS JS event status ack interface
+) bool {
+	_, span := otel.Tracer(pkgName).Start(
+		ctx,
+		"stateFinalized",
+	)
+	defer span.End()
+
+	// check and see if the condition is or has-been handled by another controller
+	currentState := conditionStatusQueryor.ConditionState(cond.ID.String())
+	le := n.logger.WithFields(logrus.Fields{
+		"conditionID":     cond.ID.String(),
+		"state":           cond.State,
+		"lifecycle-state": currentState,
+	})
+
+	switch currentState {
+	case inProgress:
+		le.Info("condition is already in progress")
+		eventAcknowleger.inProgress()
+		spanEvent(span, cond, n.ID(), "ackInProgress")
+
+		return false
+
+	case complete:
+		le.Info("condition is complete")
+		eventAcknowleger.complete()
+		spanEvent(span, cond, n.ID(), "ackComplete")
+
+		return false
+
+	case orphaned:
+		le.Info("restarting this condition")
+		eventAcknowleger.inProgress()
+		spanEvent(span, cond, n.ID(), "restarting condition")
+
+		return true
+
+	case notStarted:
+		le.Info("starting new condition")
+		eventAcknowleger.inProgress()
+		spanEvent(span, cond, n.ID(), "start new condition")
+
+		return true
+
+	// break out here, this is a new event
+	case indeterminate:
+		le.Warn("unable to determine state of this condition")
+		// send it back to NATS to try again
+		eventAcknowleger.nak()
+		spanEvent(span, cond, n.ID(), "sent nack, indeterminate state")
+
+		return false
+
+	default:
+		le.Warn("unexpected state")
+		eventAcknowleger.complete()
+		spanEvent(span, cond, n.ID(), "ackComplete")
+
+		return false
+	}
+}
+
 // process condition
 func (n *NatsController) processCondition(
 	ctx context.Context,
 	cond *condition.Condition,
+	publisher Publisher, // Task, Status KV publisher
 	eventAcknowleger eventStatusAcknowleger, // the NATS JS event status ack interface
-	conditionStatusQueryor ConditionStatusQueryor, // the condition status query interface
-	conditionStatusPublisher ConditionStatusPublisher, // the condition status publish interface
 ) {
 	ctx, span := otel.Tracer(pkgName).Start(
 		ctx,
@@ -381,40 +448,28 @@ func (n *NatsController) processCondition(
 		},
 	)
 
-	// check and see if the condition is or has-been handled by another controller
-	currentState := conditionStatusQueryor.ConditionState(cond.ID.String())
-	switch currentState {
-	case inProgress:
-		n.logger.WithField("conditionID", cond.ID.String()).Info("condition is already in progress")
-		eventAcknowleger.inProgress()
-		spanEvent(span, cond, n.ID(), "ackInProgress")
+	// create first record of condition in controller KV
+	//
+	// failure to publish the first status KV record is fatal
+	task := condition.NewTaskFromCondition(cond)
+	task.Status = condition.NewTaskStatusRecord("In process by controller: " + n.hostname)
 
-		return
+	if err := publisher.Publish(ctx, task, false); err != nil {
+		msg := "error publishing first KV status record, condition aborted"
+		n.logger.WithError(err).WithFields(logrus.Fields{
+			"conditionID": cond.ID.String(),
+		}).Error(msg)
 
-	case complete:
-		n.logger.WithField("conditionID", cond.ID.String()).Info("condition is complete")
-		eventAcknowleger.complete()
-		spanEvent(span, cond, n.ID(), "ackComplete")
-
-		return
-
-	case orphaned:
-		n.logger.WithField("conditionID", cond.ID.String()).Warn("restarting this condition")
-		eventAcknowleger.inProgress()
-		spanEvent(span, cond, n.ID(), "restarting condition")
-
-	// we need to restart this event
-	case notStarted:
-		n.logger.WithField("conditionID", cond.ID.String()).Info("starting new condition")
-		eventAcknowleger.inProgress()
-		spanEvent(span, cond, n.ID(), "start new condition")
-
-	// break out here, this is a new event
-	case indeterminate:
-		n.logger.WithField("conditionID", cond.ID.String()).Warn("unable to determine state of this condition")
-		// send it back to NATS to try again
+		// send this message back on the bus to be redelivered, or atleast attempt to.
 		eventAcknowleger.nak()
-		spanEvent(span, cond, n.ID(), "sent nack, indeterminate state")
+
+		metricsEventsCounter(true, "nack")
+		spanEvent(
+			span,
+			cond,
+			n.ID(),
+			fmt.Sprintf("sent nack, info: %s, err: %s", msg, err.Error()),
+		)
 
 		return
 	}
