@@ -283,23 +283,15 @@ func (n *NatsController) processEvents(ctx context.Context) error {
 			return errors.Wrap(errProcessEvent, ctx.Err().Error())
 		}
 
-		// setup the handle to query condition status
-		conditionStatusQueryor, err := n.NewNatsConditionStatusQueryor()
-		if err != nil {
-			eventAcknowleger.nak()
-
-			return errors.Wrap(errProcessEvent, err.Error())
-		}
-
 		// spawn msg process handler
 		n.syncWG.Add(1)
-		go n.processConditionFromEvent(ctx, msg, eventAcknowleger, conditionStatusQueryor)
+		go n.processConditionFromEvent(ctx, msg, eventAcknowleger)
 	}
 
 	return nil
 }
 
-func (n *NatsController) processConditionFromEvent(ctx context.Context, msg events.Message, eventAcknowleger eventStatusAcknowleger, conditionStatusQueryor ConditionStatusQueryor) {
+func (n *NatsController) processConditionFromEvent(ctx context.Context, msg events.Message, eventAcknowleger eventStatusAcknowleger) {
 	defer n.syncWG.Done()
 	ctx, span := otel.Tracer(pkgName).Start(
 		ctx,
@@ -314,6 +306,7 @@ func (n *NatsController) processConditionFromEvent(ctx context.Context, msg even
 		n.logger.WithError(err).WithField(
 			"subject", msg.Subject()).Warn("unable to retrieve condition from message")
 
+		spanEvent(span, cond, n.ID(), "sent ack, unable to retrieve condition from message: "+err.Error())
 		metricsEventsCounter(false, "ack")
 		eventAcknowleger.complete()
 
@@ -323,24 +316,56 @@ func (n *NatsController) processConditionFromEvent(ctx context.Context, msg even
 	// extract parent trace context from the event if any.
 	ctx = msg.ExtractOtelTraceContext(ctx)
 
-	conditionStatusPublisher, err := NewNatsConditionStatusPublisher(
-		"test",
+	// setup the handle to query condition status
+	conditionStatusQueryor, err := n.NewNatsConditionStatusQueryor()
+	if err != nil {
+		eventAcknowleger.nak()
+
+		n.logger.WithField(
+			"conditionID", cond.ID.String(),
+		).WithError(err).Error("failed to initialize Condition status queryor")
+
+		return
+	}
+
+	// check current state is finalized
+	if n.stateFinalized(ctx, cond, conditionStatusQueryor, eventAcknowleger) {
+		return
+	}
+
+	// init publisher
+	publisher, err := NewNatsPublisher(
+		n.natsConfig.AppName,
 		cond.ID.String(),
+		cond.Target.String(),
 		n.facilityCode,
-		cond.Kind,
+		n.conditionKind,
 		n.liveness.ControllerID(),
-		0,
+		n.natsConfig.KVReplicationFactor,
 		n.stream.(*events.NatsJetstream),
 		n.logger,
 	)
 	if err != nil {
-		n.logger.WithField("conditionID", cond.ID.String()).Warn("failed to initialize publisher")
+		msg := "publisher init failed"
+		n.logger.WithError(err).WithFields(logrus.Fields{
+			"conditionID": cond.ID.String(),
+		}).Error(msg)
+
+		// send this message back on the bus to be redelivered, or atleast attempt to.
 		eventAcknowleger.nak()
-		spanEvent(span, cond, n.ID(), "sent nack, failed to initialize publisher: "+err.Error())
+
+		metricsEventsCounter(true, "nack")
+		spanEvent(
+			span,
+			cond,
+			n.ID(),
+			fmt.Sprintf("sent nack, info: %s, err: %s", msg, err.Error()),
+		)
+
 		return
 	}
 
-	n.processCondition(ctx, cond, eventAcknowleger, conditionStatusQueryor, conditionStatusPublisher)
+	n.processCondition(ctx, cond, publisher, eventAcknowleger)
 }
 
 func conditionFromEvent(e events.Message) (*condition.Condition, error) {
