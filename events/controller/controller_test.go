@@ -3,6 +3,7 @@ package controller
 import (
 	"context"
 	"encoding/json"
+	"io"
 	"os"
 	"testing"
 	"time"
@@ -96,118 +97,150 @@ func TestNatsControllerDefaultParameters(t *testing.T) {
 	assert.Equal(t, kvReplicationFactor, c.natsConfig.KVReplicationFactor, "kv replicas should match the expected default value")
 }
 
-func TestProcessCondition(t *testing.T) {
+func TestStateFinalized(t *testing.T) {
 	tests := []struct {
 		name         string
 		conditionID  uuid.UUID
 		state        ConditionState
 		expectMethod string
-		handlerErr   error
+		expectBool   bool
 	}{
 		{
 			name:         "Condition in progress",
 			conditionID:  uuid.New(),
 			state:        inProgress,
 			expectMethod: "inProgress",
-			handlerErr:   nil,
+			expectBool:   false,
 		},
 		{
 			name:         "Condition complete",
 			conditionID:  uuid.New(),
 			state:        complete,
 			expectMethod: "complete",
-			handlerErr:   nil,
+			expectBool:   false,
 		},
 		{
 			name:         "Condition orphaned",
 			conditionID:  uuid.New(),
 			state:        orphaned,
 			expectMethod: "inProgress",
-			handlerErr:   nil,
+			expectBool:   true,
 		},
 		{
 			name:         "Condition not started",
 			conditionID:  uuid.New(),
 			state:        notStarted,
 			expectMethod: "inProgress",
-			handlerErr:   nil,
+			expectBool:   true,
 		},
 		{
 			name:         "Condition state indeterminate",
 			conditionID:  uuid.New(),
 			state:        indeterminate,
 			expectMethod: "nak",
-			handlerErr:   nil,
+			expectBool:   false,
 		},
 		{
-			name:         "Condition handler ErrRetryHandler is a nak",
+			name:         "Condition state unexpected",
 			conditionID:  uuid.New(),
-			state:        notStarted,
-			expectMethod: "inProgress",
-			handlerErr:   errors.Wrap(ErrRetryHandler, "cosmic rays"),
-		},
-		{
-			name:         "Condition handler other errors is an ack",
-			conditionID:  uuid.New(),
-			state:        notStarted,
-			expectMethod: "inProgress",
-			handlerErr:   errors.New("some other error occurred"),
+			state:        99, // unexpected lifecycle state
+			expectMethod: "complete",
+			expectBool:   false,
 		},
 	}
 
 	controllerID := registry.GetID("test")
-
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			cond := &condition.Condition{ID: tt.conditionID}
 
-			cStatusQueryor := NewMockConditionStatusQueryor(t)
-			// expect method to be invoked for each condition status query
-			cStatusQueryor.On("ConditionState", tt.conditionID.String()).Return(tt.state)
-
 			eStatusAcknowledger := NewMockeventStatusAcknowleger(t)
 			eStatusAcknowledger.On(tt.expectMethod).Return()
 
-			var cStatusPublisher *MockConditionStatusPublisher
-
-			handler := NewMockConditionHandler(t)
-			// expect handler, completions for orphaned and notStarted conditions
-			if tt.state == orphaned || tt.state == notStarted {
-				eStatusAcknowledger.On("complete").Return()
-
-				if tt.handlerErr == nil {
-					// no handler errors
-					handler.On("Handle", mock.Anything, mock.Anything, mock.Anything).Return(nil)
-				} else {
-					// handler errors
-					if errors.Is(tt.handlerErr, ErrRetryHandler) {
-						// TODO: replace with mock Jetstream publish handler
-						handler.On("Handle", mock.Anything, mock.Anything, mock.Anything).Return(tt.handlerErr)
-					} else {
-						handler.On("Handle", mock.Anything, mock.Anything, mock.Anything).Return(errors.New("some other error"))
-					}
-				}
-
-				// expect to publish status in these states
-				cStatusPublisher = NewMockConditionStatusPublisher(t)
-				cStatusPublisher.On("Publish", mock.Anything, mock.Anything, mock.Anything, mock.Anything, false).Return(nil)
-			}
+			cStatusQueryor := NewMockConditionStatusQueryor(t)
+			cStatusQueryor.On("ConditionState", tt.conditionID.String()).Return(tt.state)
 
 			mockLiveness := NewMockLivenessCheckin(t)
 			mockLiveness.On("ControllerID").Return(controllerID)
 
 			l := logrus.New()
-			l.Level = 0 // set higher value to debug
+			l.SetOutput(io.Discard) // unset this to debug
+			n := &NatsController{logger: l, liveness: mockLiveness}
+
+			gotBool := n.stateFinalized(context.Background(), cond, cStatusQueryor, eStatusAcknowledger)
+			assert.Equal(t, tt.expectBool, gotBool)
+		})
+	}
+}
+
+func TestProcessCondition(t *testing.T) {
+	cond := &condition.Condition{ID: uuid.New()}
+	tests := []struct {
+		name      string
+		setupMock func(t *testing.T) (*MockPublisher, *MockeventStatusAcknowleger, *MockLivenessCheckin)
+	}{
+		{
+			name: "First KV status publish failure",
+			setupMock: func(t *testing.T) (*MockPublisher, *MockeventStatusAcknowleger, *MockLivenessCheckin) {
+				p := NewMockPublisher(t)
+				p.On(
+					"Publish",
+					mock.Anything,
+					mock.MatchedBy(func(task *condition.Task[any, any]) bool {
+						assert.Equal(t, cond.ID, task.ID)
+						return true
+					}),
+					false,
+				).Return(errors.New("bytes exploded"))
+
+				sa := NewMockeventStatusAcknowleger(t)
+				sa.On("nak").Return()
+
+				controllerID := registry.GetID("test")
+				lv := NewMockLivenessCheckin(t)
+				lv.On("ControllerID").Return(controllerID)
+
+				return p, sa, lv
+			},
+		},
+		{
+			name: "First KV status publish success",
+			setupMock: func(t *testing.T) (*MockPublisher, *MockeventStatusAcknowleger, *MockLivenessCheckin) {
+				p := NewMockPublisher(t)
+				p.On(
+					"Publish",
+					mock.Anything,
+					mock.MatchedBy(func(task *condition.Task[any, any]) bool {
+						assert.Equal(t, cond.ID, task.ID)
+						return true
+					}),
+					false,
+				).Return(nil)
+
+				sa := NewMockeventStatusAcknowleger(t)
+				sa.On("complete").Return()
+
+				controllerID := registry.GetID("test")
+				lv := NewMockLivenessCheckin(t)
+				lv.On("ControllerID").Return(controllerID)
+
+				return p, sa, lv
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			l := logrus.New()
+			l.SetOutput(io.Discard) // unset this to debug
+
+			publisher, eStatusAcknowledger, liveness := tt.setupMock(t)
 			n := &NatsController{
-				logger:                  l,
-				conditionHandlerFactory: func() ConditionHandler { return handler },
-				liveness:                mockLiveness,
+				logger:   l,
+				liveness: liveness,
 			}
 
-			n.processCondition(context.Background(), cond, eStatusAcknowledger, cStatusQueryor, cStatusPublisher)
-
-			eStatusAcknowledger.AssertCalled(t, tt.expectMethod)
-			cStatusQueryor.AssertExpectations(t)
+			n.processCondition(context.TODO(), cond, publisher, eStatusAcknowledger)
 		})
 	}
 }
@@ -280,7 +313,7 @@ func TestConditionFromEvent(t *testing.T) {
 	}
 }
 
-func TestRunConditionHandlerWithMonitor(t *testing.T) {
+func TestRunTaskHandlerWithMonitor(t *testing.T) {
 	// test for no leaked go routines
 	// Ignore can be removed if this ever gets fixed,
 	//
@@ -293,79 +326,81 @@ func TestRunConditionHandlerWithMonitor(t *testing.T) {
 
 	testcases := []struct {
 		name            string
-		mocksetup       func() (*MockConditionHandler, *events.MockMessage, *MockConditionStatusPublisher)
+		mocksetup       func() (*MockTaskHandler, *events.MockMessage, *MockPublisher)
 		publishInterval time.Duration
 		wantErr         bool
 	}{
 		{
 			name: "handler executed successfully",
-			mocksetup: func() (*MockConditionHandler, *events.MockMessage, *MockConditionStatusPublisher) {
-				publisher := NewMockConditionStatusPublisher(t)
+			mocksetup: func() (*MockTaskHandler, *events.MockMessage, *MockPublisher) {
+				publisher := NewMockPublisher(t)
 				message := events.NewMockMessage(t)
-				handler := NewMockConditionHandler(t)
+				handler := NewMockTaskHandler(t)
 
-				handler.On("Handle", mock.Anything, cond, publisher).Times(1).
+				handler.On("HandleTask", mock.Anything, mock.IsType(&condition.Task[any, any]{}), publisher).Times(1).
 					//  sleep for 100ms
 					Run(func(_ mock.Arguments) { time.Sleep(100 * time.Millisecond) }).
 					Return(nil)
 
-				message.On("Ack").Return(nil)
 				// ts update
-				publisher.On("Publish", mock.Anything, mock.Anything, mock.Anything, mock.Anything, true).Return(nil)
-				// full status update
-				publisher.On("Publish", mock.Anything, mock.Anything, mock.Anything, mock.Anything, false).Return(nil)
-
+				publisher.On("Publish", mock.Anything, mock.IsType(&condition.Task[any, any]{}), true).Return(nil)
 				return handler, message, publisher
 			},
 			publishInterval: 10 * time.Millisecond,
 		},
 		{
 			name: "handler returns error",
-			mocksetup: func() (*MockConditionHandler, *events.MockMessage, *MockConditionStatusPublisher) {
-				publisher := NewMockConditionStatusPublisher(t)
+			mocksetup: func() (*MockTaskHandler, *events.MockMessage, *MockPublisher) {
+				publisher := NewMockPublisher(t)
 				message := events.NewMockMessage(t)
-				handler := NewMockConditionHandler(t)
+				handler := NewMockTaskHandler(t)
 
-				handler.On("Handle", mock.Anything, cond, publisher).Times(1).
+				handler.On("HandleTask", mock.Anything, mock.IsType(&condition.Task[any, any]{}), publisher).Times(1).
 					Return(errors.New("barf"))
-
-				message.On("Ack").Return(nil)
-				publisher.On("Publish", mock.Anything, mock.Anything, mock.Anything, mock.Anything, false).Return(nil)
 
 				return handler, message, publisher
 			},
-			publishInterval: 30 * time.Second,
+			publishInterval: 10 * time.Second, // high interval to allow this case to focus on a handler failure
 			wantErr:         true,
 		},
 		{
 			name: "status publish fails",
-			mocksetup: func() (*MockConditionHandler, *events.MockMessage, *MockConditionStatusPublisher) {
-				publisher := NewMockConditionStatusPublisher(t)
+			mocksetup: func() (*MockTaskHandler, *events.MockMessage, *MockPublisher) {
+				publisher := NewMockPublisher(t)
 				message := events.NewMockMessage(t)
-				handler := NewMockConditionHandler(t)
+				handler := NewMockTaskHandler(t)
 
-				message.On("Nak").Return(nil)
-				publisher.On("Publish", mock.Anything, mock.Anything, mock.Anything, mock.Anything, false).Return(errors.New("barf"))
+				handler.On("HandleTask", mock.Anything, mock.IsType(&condition.Task[any, any]{}), publisher).Times(1).
+					//  sleep for 100ms
+					Run(func(_ mock.Arguments) { time.Sleep(100 * time.Millisecond) }).
+					Return(nil)
+
+				publisher.On("Publish", mock.Anything, mock.IsType(&condition.Task[any, any]{}), true).Return(errors.New("barf"))
 
 				return handler, message, publisher
 			},
-			publishInterval: 30 * time.Second,
-			wantErr:         true,
+			publishInterval: 10 * time.Millisecond,
+			wantErr:         false,
 		},
 		{
 			name: "handler panic",
-			mocksetup: func() (*MockConditionHandler, *events.MockMessage, *MockConditionStatusPublisher) {
-				publisher := NewMockConditionStatusPublisher(t)
+			mocksetup: func() (*MockTaskHandler, *events.MockMessage, *MockPublisher) {
+				publisher := NewMockPublisher(t)
 				message := events.NewMockMessage(t)
-				handler := NewMockConditionHandler(t)
+				handler := NewMockTaskHandler(t)
 
-				handler.On("Handle", mock.Anything, cond, publisher).Times(1).
+				handler.On("HandleTask", mock.Anything, mock.IsType(&condition.Task[any, any]{}), publisher).Times(1).
 					Run(func(_ mock.Arguments) { panic("oops") })
 
-				message.On("Ack").Return(nil)
-				publisher.On("Publish", mock.Anything, mock.Anything, condition.Pending, mock.Anything, false).Return(nil)
-				publisher.On("Publish", mock.Anything, mock.Anything, condition.Failed, mock.Anything, false).Return(nil)
-
+				publisher.On(
+					"Publish",
+					mock.Anything,
+					mock.MatchedBy(func(task *condition.Task[any, any]) bool {
+						assert.Equal(t, task.State, condition.Failed)
+						return true
+					}),
+					false,
+				).Return(nil)
 				return handler, message, publisher
 			},
 			publishInterval: 30 * time.Second,
@@ -375,20 +410,19 @@ func TestRunConditionHandlerWithMonitor(t *testing.T) {
 
 	for _, tt := range testcases {
 		t.Run(tt.name, func(t *testing.T) {
-			handler, message, publisher := tt.mocksetup()
+			handler, _, publisher := tt.mocksetup()
 			l := logrus.New()
 			l.Level = 0 // set higher value to debug
 			n := &NatsController{
 				logger: l,
-				conditionHandlerFactory: func() ConditionHandler {
+				conditionHandlerFactory: func() TaskHandler {
 					return handler
 				},
 			}
 
-			err := n.runConditionHandlerWithMonitor(
+			err := n.runTaskHandlerWithMonitor(
 				ctx,
-				cond,
-				n.newNatsEventStatusAcknowleger(message),
+				condition.NewTaskFromCondition(cond),
 				publisher,
 				tt.publishInterval,
 			)
@@ -397,13 +431,9 @@ func TestRunConditionHandlerWithMonitor(t *testing.T) {
 				assert.Error(t, err)
 			} else {
 				assert.NoError(t, err)
-				handler.AssertExpectations(t)
 				assert.GreaterOrEqual(t, len(publisher.Calls), 9, "expect multiple condition TS updates")
 				assert.Equal(t, 1, len(handler.Calls), "expect handler to be called once")
 			}
-
-			message.AssertExpectations(t)
-			publisher.AssertExpectations(t)
 		})
 	}
 }
