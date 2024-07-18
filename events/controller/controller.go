@@ -195,13 +195,6 @@ func (n *NatsController) Connect(ctx context.Context) error {
 	return nil
 }
 
-// ConditionHandler is passed in by the caller to be invoked when the expected event is received
-type ConditionHandler interface {
-	Handle(ctx context.Context, condition *condition.Condition, publisher ConditionStatusPublisher) error
-}
-
-type ConditionHandlerFactory func() ConditionHandler
-
 // Handle events accepts a callback function to run when an event is fetched from the NATS JS.
 //
 // - The caller is expected to enclose any work and error handling for the work within the callback function.
