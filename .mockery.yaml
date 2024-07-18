@@ -7,7 +7,8 @@ packages:
       fileName: "mock_{{.InterfaceName | firstLower}}.go"
       inpackage: True
     interfaces:
-      ConditionHandler:
+      TaskHandler:
+      Publisher:
       StatusPublisher:
       ConditionStatusQueryor:
       ConditionStatusPublisher:
