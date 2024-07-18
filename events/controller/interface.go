@@ -6,7 +6,7 @@ import (
 	"github.com/metal-toolbox/rivets/condition"
 )
 
-// TaskHandler is passed in by the caller to be invoked when a message from the Jetstream is recieved for processing.
+// TaskHandler is passed in by the caller to be invoked when a message from the Jetstream is received for processing.
 type TaskHandler interface {
 	HandleTask(ctx context.Context, task *condition.Task[any, any], statusPublisher Publisher) error
 }
