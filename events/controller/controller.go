@@ -499,19 +499,20 @@ func (n *NatsController) processCondition(
 		return
 	}
 
+	// mark message as complete in th JS as the status KV record is in place
+	eventAcknowleger.complete()
+
 	handlerCtx, cancel := context.WithTimeout(ctx, n.handlerTimeout)
 	defer cancel()
 
-	errHandler := n.runConditionHandlerWithMonitor(handlerCtx, cond, eventAcknowleger, conditionStatusPublisher, statusInterval)
+	errHandler := n.runTaskHandlerWithMonitor(handlerCtx, task, publisher, statusInterval)
 	if errHandler != nil {
 		registerConditionRuntimeMetric(startTS, string(condition.Failed))
 
 		// handler indicates this must be retried
 		if errors.Is(errHandler, ErrRetryHandler) {
+			// Theres no retrying a Condition once its ack'ed in the JS as complete, this error condition is to be removed.
 			n.logger.WithError(errHandler).Warn("condition handler returned retry error")
-
-			// TODO: write this condition back onto the Jetstream so its retried
-			return
 		}
 
 		// other errors are logged
@@ -520,8 +521,10 @@ func (n *NatsController) processCondition(
 			span,
 			cond,
 			n.ID(),
-			"condition handler returned error: "+errHandler.Error(),
+			"condition completed with errors: "+errHandler.Error(),
 		)
+
+		return
 	}
 
 	registerConditionRuntimeMetric(startTS, string(condition.Succeeded))
@@ -530,42 +533,33 @@ func (n *NatsController) processCondition(
 		span,
 		cond,
 		n.ID(),
-		"condition complete",
+		"condition completed successfully",
 	)
 }
 
-func (n *NatsController) runConditionHandlerWithMonitor(ctx context.Context, cond *condition.Condition, eventStatusSet eventStatusAcknowleger, conditionStatusPublisher ConditionStatusPublisher, statusInterval time.Duration) (err error) {
+func (n *NatsController) runTaskHandlerWithMonitor(ctx context.Context, task *condition.Task[any, any], publisher Publisher, statusInterval time.Duration) (err error) {
 	ctx, span := otel.Tracer(pkgName).Start(
 		ctx,
-		"runConditionHandlerWithMonitor",
+		"runTaskHandlerWithMonitor",
 	)
 	defer span.End()
 
-	// create first record of condition in controller KV
-	//
-	// failure to publish the first status KV record is fatal
-	status := condition.NewTaskStatusRecord("In process by controller: " + n.hostname)
-	cond.Status = status.MustMarshal()
-	if err = conditionStatusPublisher.Publish(
-		ctx,
-		cond.Target.String(),
-		condition.Pending,
-		cond.Status,
-		false,
-	); err != nil {
-		n.logger.WithError(err).WithFields(logrus.Fields{
-			"condition.id": cond.ID.String(),
-		}).Warn("error publishing first KV status record, condition aborted")
+	// local publish helper method
+	publish := func(state condition.State, status string, tsUpdate bool) {
+		if !tsUpdate {
+			// append to existing status record, unless it was overwritten by the controller somehow
+			task.Status.Append(status)
+			task.State = state
+		}
 
-		// send this message back on the bus to be redelivered, or atleast attempt to.
-		eventStatusSet.nak()
-		metricsEventsCounter(true, "nack")
-
-		return err
+		if errPublish := publisher.Publish(
+			ctx,
+			task,
+			tsUpdate,
+		); errPublish != nil {
+			n.logger.WithError(errPublish).Error("failed to publish update")
+		}
 	}
-
-	// mark message as complete as the status KV record is in place
-	eventStatusSet.complete()
 
 	// doneCh indicates the handler run completed
 	doneCh := make(chan bool)
@@ -575,23 +569,13 @@ func (n *NatsController) runConditionHandlerWithMonitor(ctx context.Context, con
 		ticker := time.NewTicker(statusInterval)
 		defer ticker.Stop()
 
-		// periodically update the LastUpdate TS in status KV,
-		/// which keeps the Orchestrator from reconciling this condition.
+		// periodically update the UpdateAt timestamp,
+		// which keeps the Orchestrator from reconciling this condition.
 	Loop:
 		for {
 			select {
 			case <-ticker.C:
-				if errUpdate := conditionStatusPublisher.Publish(
-					ctx,
-					cond.Target.String(),
-					condition.Active,  // field ignored in a TS update publish
-					json.RawMessage{}, // field ignored in a TS update publish
-					true,              // Just update TS
-				); errUpdate != nil {
-					n.logger.WithError(errUpdate).WithFields(logrus.Fields{
-						"condition.id": cond.ID.String(),
-					}).Warn("status timestamp update publish error")
-				}
+				publish(condition.Active, "", true)
 			case <-doneCh:
 				break Loop
 			}
@@ -609,34 +593,11 @@ func (n *NatsController) runConditionHandlerWithMonitor(ctx context.Context, con
 			n.logger.Printf("!!panic %s: %s", rec, debug.Stack())
 			n.logger.Error(err)
 
-			// append to existing status record, unless it was overwritten by the controller somehow
-			statusRecord, errSR := condition.StatusRecordFromMessage(cond.Status)
-			if errSR != nil {
-				n.logger.WithError(errSR).WithFields(logrus.Fields{
-					"condition.id": cond.ID.String(),
-				}).Warn("error parsing existing status record from condition")
-			} else {
-				statusRecord.Append("Fatal error running Condition, check logs for details")
-			}
-
-			// publish failed state, status
-			//
-			// Publish logs error internally
-			if errUpdate := conditionStatusPublisher.Publish(
-				ctx,
-				cond.Target.String(),
-				condition.Failed,
-				statusRecord.MustMarshal(),
-				false,
-			); errUpdate != nil {
-				n.logger.WithError(errUpdate).WithFields(logrus.Fields{
-					"condition.id": cond.ID.String(),
-				}).Warn("status update publish error")
-			}
+			publish(condition.Failed, "Fatal error running Condition, check logs for details", false)
 		}
 	}() // nolint:errcheck // nope
 
-	return n.conditionHandlerFactory().Handle(ctx, cond, conditionStatusPublisher)
+	return n.conditionHandlerFactory().HandleTask(ctx, task, publisher)
 }
 
 func (n *NatsController) concurrencyLimit() bool {
