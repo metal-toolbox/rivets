@@ -141,13 +141,20 @@ type Condition struct {
 	CreatedAt time.Time `json:"createdAt,omitempty"`
 }
 
-func (c *Condition) StreamPublishSubject(facilityCode string) string {
-	// note: inband install conditions are published with the serverID in the subject suffix
-	if c.Kind == FirmwareInstallInband {
-		return fmt.Sprintf("%s.servers.%s.%s", facilityCode, c.Kind, c.Target.String())
-
+// Returns bool for when a Condition should be published to the Jetstream.
+func (c *Condition) StreamPublishRequired() bool {
+	switch c.Kind {
+	// The FirmwareInstallInband condition is handled by inband controllers,
+	// these inband controllers fetch pending Conditions through the Orchestrator API,
+	// which gets it from the Active-Condition records KV.
+	case FirmwareInstallInband:
+		return false
+	default:
+		return true
 	}
+}
 
+func (c *Condition) StreamPublishSubject(facilityCode string) string {
 	return fmt.Sprintf("%s.servers.%s", facilityCode, c.Kind)
 }
 
