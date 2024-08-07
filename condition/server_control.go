@@ -1,6 +1,10 @@
 package condition
 
-import "github.com/google/uuid"
+import (
+	"encoding/json"
+
+	"github.com/google/uuid"
+)
 
 type (
 	ServerControlAction string
@@ -72,6 +76,14 @@ type ServerControlTaskParameters struct {
 	// For use with SetNextBootDevice action.
 	// Required: false
 	SetNextBootDeviceEFI bool `json:"set_next_boot_device_efi"`
+}
+
+func (p *ServerControlTaskParameters) Unmarshal(r json.RawMessage) error {
+	return json.Unmarshal(r, p)
+}
+
+func (p *ServerControlTaskParameters) Marshal() (json.RawMessage, error) {
+	return json.Marshal(p)
 }
 
 func NewServerControlTaskParameters(assetID uuid.UUID, action ServerControlAction, controlParam string, bootDevicePersistent, efiBoot bool) *ServerControlTaskParameters {
