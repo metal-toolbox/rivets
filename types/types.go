@@ -1,6 +1,7 @@
 package types
 
 import (
+	"strings"
 	"time"
 
 	"github.com/bmc-toolbox/common"
@@ -17,6 +18,47 @@ type Component struct {
 	Vendor     string               `json:"vendor,omitempty"`
 	Model      string               `json:"model,omitempty"`
 	Serial     string               `json:"serial,omitempty"`
+}
+
+// Components is a list of Component
+type Components []*Component
+
+// BySlugModel returns a component that matches the slug value.
+func (c Components) BySlugModel(cSlug string, cModels []string) *Component {
+	// identify components that match the slug
+	slugsMatch := []*Component{}
+	for _, component := range c {
+		component := component
+		// skip non matching component slug
+		if !strings.EqualFold(cSlug, component.Name) {
+			continue
+		}
+
+		// since theres a single BIOS, BMC (:fingers_crossed) component on a machine
+		// we look for further and return the found component
+		if strings.EqualFold(common.SlugBIOS, cSlug) || strings.EqualFold(common.SlugBMC, cSlug) {
+			return component
+		}
+
+		slugsMatch = append(slugsMatch, component)
+	}
+
+	// none found
+	if len(slugsMatch) == 0 {
+		return nil
+	}
+
+	// multiple components identified, match component by model
+	for _, find := range cModels {
+		for _, component := range slugsMatch {
+			find = strings.ToLower(strings.TrimSpace(find))
+			if strings.Contains(strings.ToLower(component.Model), find) {
+				return component
+			}
+		}
+	}
+
+	return nil
 }
 
 // Server is a generic server  type
