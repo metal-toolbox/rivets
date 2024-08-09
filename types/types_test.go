@@ -7,7 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestComponentBySlugModel(t *testing.T) {
+func TestComponentsByNameModel(t *testing.T) {
 	component1 := &Component{
 		Name:     "cpu",
 		Serial:   "123",
@@ -108,7 +108,7 @@ func TestComponentBySlugModel(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			result := components.BySlugModel(tc.slug, tc.models)
+			result := components.ByNameModel(tc.slug, tc.models)
 			assert.Equal(t, tc.expected, result)
 		})
 	}
