@@ -23,8 +23,8 @@ type Component struct {
 // Components is a list of Component
 type Components []*Component
 
-// BySlugModel returns a component that matches the slug value.
-func (c Components) BySlugModel(cSlug string, cModels []string) *Component {
+// ByNameModel returns a component that matches the name field.
+func (c Components) ByNameModel(cSlug string, cModels []string) *Component {
 	// identify components that match the slug
 	slugsMatch := []*Component{}
 	for _, component := range c {
