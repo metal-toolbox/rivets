@@ -47,6 +47,9 @@ const (
 
 	// PowerCycleBMC power cycles the BMC
 	PowerCycleBMC ServerControlAction = "power_cycle_bmc"
+
+	// Run a basic firmware test
+	ValidateFirmware ServerControlAction = "validate_firmware"
 )
 
 // ServerControlTaskParameters are the parameters that are passed for the ServerControl condition.
@@ -76,6 +79,10 @@ type ServerControlTaskParameters struct {
 	// For use with SetNextBootDevice action.
 	// Required: false
 	SetNextBootDeviceEFI bool `json:"set_next_boot_device_efi"`
+
+	// The timeout in seconds for a ValidateFirmware action
+	// Required for ValidateFirmware.
+	ValidateFirmwareTimeout uint `json:"validate_firmware_timeout"`
 }
 
 func (p *ServerControlTaskParameters) Unmarshal(r json.RawMessage) error {
