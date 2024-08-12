@@ -2,6 +2,7 @@ package condition
 
 import (
 	"encoding/json"
+	"time"
 
 	"github.com/google/uuid"
 )
@@ -80,9 +81,9 @@ type ServerControlTaskParameters struct {
 	// Required: false
 	SetNextBootDeviceEFI bool `json:"set_next_boot_device_efi"`
 
-	// The timeout in seconds for a ValidateFirmware action
+	// The timeout for a ValidateFirmware action
 	// Required for ValidateFirmware.
-	ValidateFirmwareTimeout uint `json:"validate_firmware_timeout"`
+	ValidateFirmwareTimeout time.Duration `json:"validate_firmware_timeout"`
 }
 
 func (p *ServerControlTaskParameters) Unmarshal(r json.RawMessage) error {
