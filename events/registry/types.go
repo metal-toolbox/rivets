@@ -60,6 +60,13 @@ func GetID(app string) ControllerID {
 	}
 }
 
+func GetIDWithUUID(app string, id uuid.UUID) ControllerID {
+	return &workerUUID{
+		appName: app,
+		uuid:    id,
+	}
+}
+
 type activityRecord struct {
 	LastActive time.Time `json:"last_active"`
 }
