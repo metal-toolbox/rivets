@@ -46,6 +46,9 @@ const (
 	// - utilities
 	SetNextBootDevice ServerControlAction = "set_next_boot_device"
 
+	// Set PXE boot persistent and power on/cycle the server
+	PxeBootPersistent ServerControlAction = "pxe_boot_persistent"
+
 	// PowerCycleBMC power cycles the BMC
 	PowerCycleBMC ServerControlAction = "power_cycle_bmc"
 
@@ -92,6 +95,14 @@ func (p *ServerControlTaskParameters) Unmarshal(r json.RawMessage) error {
 
 func (p *ServerControlTaskParameters) Marshal() (json.RawMessage, error) {
 	return json.Marshal(p)
+}
+
+func (p *ServerControlTaskParameters) MustJSON() []byte {
+	byt, err := json.Marshal(p)
+	if err != nil {
+		panic(err)
+	}
+	return byt
 }
 
 func NewServerControlTaskParameters(assetID uuid.UUID, action ServerControlAction, controlParam string, bootDevicePersistent, efiBoot bool) *ServerControlTaskParameters {
