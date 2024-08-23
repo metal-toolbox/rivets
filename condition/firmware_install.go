@@ -68,12 +68,14 @@ func (p *FirmwareInstallTaskParameters) MustJSON() []byte {
 
 // Firmware holds attributes for a firmware object
 type Firmware struct {
-	ID        string   `yaml:"id" json:"id"`
-	Vendor    string   `yaml:"vendor" json:"vendor"`
-	FileName  string   `yaml:"filename" json:"filename"`
-	Version   string   `yaml:"version" json:"version"`
-	URL       string   `yaml:"URL" json:"URL"`
-	Component string   `yaml:"component" json:"component"`
-	Checksum  string   `yaml:"checksum" json:"checksum"`
-	Models    []string `yaml:"models" json:"models"`
+	ID            string   `yaml:"id" json:"id"`
+	Vendor        string   `yaml:"vendor" json:"vendor"`
+	FileName      string   `yaml:"filename" json:"filename"`
+	Version       string   `yaml:"version" json:"version"`
+	URL           string   `yaml:"URL" json:"URL"`
+	Component     string   `yaml:"component" json:"component"`
+	Checksum      string   `yaml:"checksum" json:"checksum"`
+	Models        []string `yaml:"models" json:"models"`
+	InstallInband bool     `yaml:"install_inband" json:"install_inband"`
+	Oem           bool     `yaml:"oem" json:"oem"`
 }
