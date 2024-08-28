@@ -10,7 +10,7 @@ import (
 
 const (
 	// nats server connection timeout
-	connectTimeout = 100 * time.Millisecond
+	connectTimeout = 60 * time.Second
 
 	// reconnect jitter
 	reconnectJitter = 10 * time.Second
