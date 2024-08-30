@@ -87,6 +87,10 @@ type ServerControlTaskParameters struct {
 	// The timeout for a ValidateFirmware action
 	// Required for ValidateFirmware.
 	ValidateFirmwareTimeout time.Duration `json:"validate_firmware_timeout"`
+
+	// The firmware set identifier for the validate firmware action
+	// Required for ValidateFirmware
+	ValidateFirmwareID uuid.UUID `json:"validate_firmware_id"`
 }
 
 func (p *ServerControlTaskParameters) Unmarshal(r json.RawMessage) error {
