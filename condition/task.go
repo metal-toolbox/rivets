@@ -178,5 +178,7 @@ func NewTaskFromCondition(cond *Condition) *Task[any, any] {
 		Data:          json.RawMessage(`{"empty": true}`), // placeholder value
 		Fault:         cond.Fault,
 		Status:        *sr,
+		TraceID:       cond.TraceID,
+		SpanID:        cond.SpanID,
 	}
 }
