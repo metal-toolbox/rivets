@@ -107,6 +107,12 @@ type Condition struct {
 	// Client is the user/jwt user that requested the condition.
 	Client string `json:"client"`
 
+	// TraceID enables tracking a Condition and any associated Conditions
+	TraceID string `json:"traceID"`
+
+	// SpanID enables tracking a Condition and any associated Conditions
+	SpanID string `json:"spanID"`
+
 	// ID is the identifier for this condition.
 	ID uuid.UUID `json:"id"`
 
