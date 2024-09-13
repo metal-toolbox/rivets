@@ -6,7 +6,7 @@ lint:
 
 ## Go test
 test: lint
-	CGO_ENABLED=0 go test -tags testtools -timeout 2m -v -covermode=atomic ./...
+	CGO_ENABLED=0 go test -tags testtools -timeout 1m -v -covermode=atomic ./...
 
 ## Generate mocks
 gen-mock:
