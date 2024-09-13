@@ -57,6 +57,8 @@ type AuthConfig struct {
 }
 
 // NewAuthMiddleware will return an auth middleware configured with the jwt parameters passed in
+//
+//nolint:gocritic // Not replacing cfg with a pointer, its an API, so would require us to fix its use in other repos
 func NewAuthMiddleware(cfg AuthConfig) (*Middleware, error) {
 	if cfg.RolesClaim == "" {
 		cfg.RolesClaim = "scope"
@@ -135,6 +137,8 @@ func (m *Middleware) VerifyTokenWithScopes(c *gin.Context, scopes []string) (gin
 
 // VerifyToken verifies a JWT token gotten from the gin.Context object. This does not validate roles claims/scopes.
 // This implements the GenericMiddleware interface
+//
+//nolint:gocyclo // we should reduce the complexity of this function at some point
 func (m *Middleware) VerifyToken(c *gin.Context) (ginauth.ClaimMetadata, error) {
 	authHeader := c.Request.Header.Get("Authorization")
 
@@ -144,7 +148,7 @@ func (m *Middleware) VerifyToken(c *gin.Context) (ginauth.ClaimMetadata, error) 
 
 	authHeaderParts := strings.SplitN(authHeader, " ", expectedAuthHeaderParts)
 
-	if !(len(authHeaderParts) == expectedAuthHeaderParts && strings.ToLower(authHeaderParts[0]) == "bearer") {
+	if !(len(authHeaderParts) == expectedAuthHeaderParts && strings.EqualFold(authHeaderParts[0], "bearer")) {
 		return ginauth.ClaimMetadata{}, ginauth.NewAuthenticationError("invalid authorization header, expected format: \"Bearer token\"")
 	}
 
@@ -277,7 +281,7 @@ func (m *Middleware) refreshJWKS() error {
 		ctx = context.Background()
 	}
 
-	req, reqerr := http.NewRequestWithContext(ctx, http.MethodGet, m.config.JWKSURI, nil)
+	req, reqerr := http.NewRequestWithContext(ctx, http.MethodGet, m.config.JWKSURI, http.NoBody)
 	if reqerr != nil {
 		return reqerr
 	}

@@ -89,11 +89,13 @@ func TestHelperJWKSProvider(keyIDs ...string) string {
 		c.JSON(http.StatusOK, keySet)
 	})
 
+	//nolint:gosec // its a test, we dont care
 	listener, err := net.Listen("tcp", ":0")
 	if err != nil {
 		panic(err)
 	}
 
+	//nolint:gosec // its a test, we dont care
 	s := &http.Server{
 		Handler: r,
 	}
@@ -108,6 +110,8 @@ func TestHelperJWKSProvider(keyIDs ...string) string {
 }
 
 // TestHelperGetToken will return a signed token
+//
+//nolint:gocritic // Not replacing cl with a pointer
 func TestHelperGetToken(signer jose.Signer, cl jwt.Claims, key string, value interface{}) string {
 	sc := map[string]interface{}{}
 

@@ -240,7 +240,7 @@ func TestMiddlewareValidatesTokensWithScopes(t *testing.T) {
 			})
 
 			w := httptest.NewRecorder()
-			req := httptest.NewRequest("GET", "http://test/", nil)
+			req := httptest.NewRequest("GET", "http://test/", http.NoBody)
 
 			signer := ginjwt.TestHelperMustMakeSigner(jose.RS256, tt.signingKeyID, tt.signingKey)
 			rawToken := ginjwt.TestHelperGetToken(signer, tt.claims, "scope", strings.Join(tt.claimScopes, " "))
@@ -404,7 +404,7 @@ func TestMiddlewareAuthRequired(t *testing.T) {
 			})
 
 			w := httptest.NewRecorder()
-			req := httptest.NewRequest("GET", "http://test/", nil)
+			req := httptest.NewRequest("GET", "http://test/", http.NoBody)
 
 			signer := ginjwt.TestHelperMustMakeSigner(jose.RS256, tt.signingKeyID, tt.signingKey)
 			rawToken := ginjwt.TestHelperGetToken(signer, tt.claims, "scope", strings.Join(tt.claimScopes, " "))
@@ -465,7 +465,7 @@ func TestInvalidAuthHeader(t *testing.T) {
 			})
 
 			w := httptest.NewRecorder()
-			req := httptest.NewRequest("GET", "http://test/", nil)
+			req := httptest.NewRequest("GET", "http://test/", http.NoBody)
 
 			req.Header.Set("Authorization", tt.authHeader)
 			r.ServeHTTP(w, req)

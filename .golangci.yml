@@ -3,11 +3,14 @@
 service:
   golangci-lint-version: 1.55.2 # use the fixed version to not introduce new linters unexpectedly
 
+run:
+  build-tags:
+    - testtools
+
 linters-settings:
   govet:
     enable:
     auto-fix: true
-    check-shadowing: true
     settings:
       printf:
         funcs:
@@ -70,12 +73,9 @@ linters:
   enable-all: false
   disable-all: true
 
-run:
-  #  build-tags:
-  skip-dirs:
-    - internal/fixtures
-
 issues:
+  exclude-dirs:
+    - internal/fixtures
   exclude-rules:
     - linters:
         - gosec
@@ -108,3 +108,5 @@ issues:
     # EXC0010 gosec: False positive is triggered by 'src, err := ioutil.ReadFile(filename)'
     - Potential file inclusion via variable
 exclude-use-default: false
+
+shadow: true

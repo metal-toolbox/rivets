@@ -14,8 +14,8 @@ func NewMultiTokenMiddlewareFromConfigs(cfgs ...AuthConfig) (*ginauth.MultiToken
 
 	mtm := &ginauth.MultiTokenMiddleware{}
 
-	for _, cfg := range cfgs {
-		middleware, err := NewAuthMiddleware(cfg)
+	for i := range cfgs {
+		middleware, err := NewAuthMiddleware(cfgs[i])
 		if err != nil {
 			return nil, err
 		}
