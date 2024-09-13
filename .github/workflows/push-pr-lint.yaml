@@ -21,6 +21,8 @@ jobs:
 
     - name: Test
       run: go test ./...
+      with:
+        args: -tags testtools
 
   build:
     runs-on: ubuntu-latest

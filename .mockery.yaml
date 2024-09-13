@@ -1,19 +1,6 @@
 testonly: False
 with-expecter: True
 packages:
-  github.com/metal-toolbox/rivets/events/controller:
-    config:
-      dir: events/controller
-      fileName: "mock_{{.InterfaceName | firstLower}}.go"
-      inpackage: True
-    interfaces:
-      TaskHandler:
-      Publisher:
-      StatusPublisher:
-      ConditionStatusQueryor:
-      ConditionStatusPublisher:
-      eventStatusAcknowleger:
-      LivenessCheckin:
   github.com/metal-toolbox/rivets/events:
     config:
       dir: events/
