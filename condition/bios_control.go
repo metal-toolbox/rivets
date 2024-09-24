@@ -31,6 +31,22 @@ type BiosControlTaskParameters struct {
 	Action BiosControlAction `json:"action"`
 }
 
+func (p *BiosControlTaskParameters) Unmarshal(r json.RawMessage) error {
+	return json.Unmarshal(r, p)
+}
+
+func (p *BiosControlTaskParameters) Marshal() (json.RawMessage, error) {
+	return json.Marshal(p)
+}
+
+func (p *BiosControlTaskParameters) MustJSON() []byte {
+	byt, err := json.Marshal(p)
+	if err != nil {
+		panic(err)
+	}
+	return byt
+}
+
 func NewBiosControlTaskParameters(assetID uuid.UUID, action BiosControlAction) *BiosControlTaskParameters {
 	return &BiosControlTaskParameters{
 		AssetID: assetID,
