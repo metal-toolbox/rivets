@@ -22,7 +22,7 @@ require (
 	go.opentelemetry.io/otel/trace v1.28.0
 	golang.org/x/exp v0.0.0-20240719175910-8a7402abbf56
 	golang.org/x/net v0.28.0
-	gopkg.in/square/go-jose.v2 v2.6.0
+	gopkg.in/go-jose/go-jose.v2 v2.6.3
 )
 
 require github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
