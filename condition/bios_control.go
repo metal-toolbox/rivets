@@ -14,8 +14,11 @@ const (
 	// BiosControl identifies the Condition kind to configure the BIOS.
 	BiosControl Kind = "biosControl"
 
-	// ResetSettings will reset the BIOS to default settings.
-	ResetSettings BiosControlAction = "reset_settings"
+	// ResetBiosConfig will reset the BIOS to default settings.
+	ResetConfig BiosControlAction = "reset_config"
+
+	// SetBiosConfig will set a new BIOS config
+	SetConfig BiosControlAction = "set_config"
 )
 
 // BiosControlTaskParameters are the parameters that are passed for the BiosControl condition.
