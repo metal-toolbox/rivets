@@ -2,6 +2,7 @@ package condition
 
 import (
 	"encoding/json"
+	"net/url"
 
 	"github.com/google/uuid"
 )
@@ -32,6 +33,12 @@ type BiosControlTaskParameters struct {
 	//
 	// Required: true
 	Action BiosControlAction `json:"action"`
+
+	// The URL for the bios configuration settings file.
+	// Needed for BiosControlAction.SetConfig
+	//
+	// Required: false
+	BiosConfigURL *url.URL `json:"bios_config_url,omitempty"`
 }
 
 func (p *BiosControlTaskParameters) Unmarshal(r json.RawMessage) error {
@@ -50,10 +57,11 @@ func (p *BiosControlTaskParameters) MustJSON() []byte {
 	return byt
 }
 
-func NewBiosControlTaskParameters(assetID uuid.UUID, action BiosControlAction) *BiosControlTaskParameters {
+func NewBiosControlTaskParameters(assetID uuid.UUID, action BiosControlAction, configURL *url.URL) *BiosControlTaskParameters {
 	return &BiosControlTaskParameters{
-		AssetID: assetID,
-		Action:  action,
+		AssetID:       assetID,
+		Action:        action,
+		BiosConfigURL: configURL,
 	}
 }
 
