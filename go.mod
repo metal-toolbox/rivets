@@ -5,11 +5,11 @@ go 1.22
 toolchain go1.22.2
 
 require (
-	github.com/bmc-toolbox/common v0.0.0-20240723142833-87832458b53b
+	github.com/bmc-toolbox/common v0.0.0-20240926143744-8c478be881d7
 	github.com/gin-gonic/gin v1.10.0
 	github.com/google/uuid v1.6.0
 	github.com/hashicorp/go-multierror v1.1.1
-	github.com/metal-toolbox/fleetdb v1.19.5
+	github.com/metal-toolbox/fleetdb v1.19.8
 	github.com/nats-io/nats-server/v2 v2.10.12
 	github.com/nats-io/nats.go v1.36.0
 	github.com/pkg/errors v0.9.1
