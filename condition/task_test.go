@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	rtypes "github.com/metal-toolbox/rivets/types"
+	rtypes "github.com/metal-toolbox/rivets/v2/types"
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 )
