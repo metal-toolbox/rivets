@@ -14,17 +14,14 @@ jobs:
         go-version-file: go.mod
 
     - name: golangci-lint
-      uses: golangci/golangci-lint-action@v3
+      uses: golangci/golangci-lint-action@v6
       with:
         args: --config .golangci.yml --timeout 2m
         version: v1.60.0
 
-    - name: Test
-      run: go test ./... -tags testtools
-
-  build:
+  build-test:
     runs-on: ubuntu-latest
-    needs: [lint-test]
+    needs: [golangci-lint]
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -33,3 +30,7 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
+
+    - name: Test
+      run: go test ./... -tags testtools
+
