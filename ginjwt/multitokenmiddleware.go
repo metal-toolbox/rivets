@@ -3,7 +3,7 @@ package ginjwt
 import (
 	"github.com/pkg/errors"
 
-	"github.com/metal-toolbox/rivets/ginauth"
+	"github.com/metal-toolbox/rivets/v2/ginauth"
 )
 
 // NewMultiTokenMiddlewareFromConfigs builds a MultiTokenMiddleware object from multiple AuthConfigs.

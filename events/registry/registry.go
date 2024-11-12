@@ -14,8 +14,8 @@ import (
 
 	"github.com/nats-io/nats.go"
 
-	"github.com/metal-toolbox/rivets/events"
-	"github.com/metal-toolbox/rivets/events/pkg/kv"
+	"github.com/metal-toolbox/rivets/v2/events"
+	"github.com/metal-toolbox/rivets/v2/events/pkg/kv"
 )
 
 var (

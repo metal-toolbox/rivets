@@ -14,7 +14,7 @@ import (
 	traceSDK "go.opentelemetry.io/otel/sdk/trace"
 	"go.opentelemetry.io/otel/trace"
 
-	natsTest "github.com/metal-toolbox/rivets/events/internal/test"
+	natsTest "github.com/metal-toolbox/rivets/v2/events/internal/test"
 )
 
 func TestJetstreamFromConn(t *testing.T) {

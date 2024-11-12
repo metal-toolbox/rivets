@@ -3,7 +3,7 @@ package types
 import (
 	"testing"
 
-	"github.com/bmc-toolbox/common"
+	common "github.com/metal-toolbox/bmc-common"
 	"github.com/stretchr/testify/assert"
 )
 
