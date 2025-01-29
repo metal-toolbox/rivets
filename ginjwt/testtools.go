@@ -12,8 +12,8 @@ import (
 	"sync"
 
 	"github.com/gin-gonic/gin"
-	"gopkg.in/go-jose/go-jose.v2"
-	"gopkg.in/go-jose/go-jose.v2/jwt"
+	jose "github.com/go-jose/go-jose/v4"
+	"github.com/go-jose/go-jose/v4/jwt"
 )
 
 var (
@@ -117,7 +117,7 @@ func TestHelperGetToken(signer jose.Signer, cl jwt.Claims, key string, value int
 
 	sc[key] = value
 
-	raw, err := jwt.Signed(signer).Claims(cl).Claims(sc).CompactSerialize()
+	raw, err := jwt.Signed(signer).Claims(cl).Claims(sc).Serialize()
 	if err != nil {
 		panic(err)
 	}

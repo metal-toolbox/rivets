@@ -8,10 +8,10 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	jose "github.com/go-jose/go-jose/v4"
+	"github.com/go-jose/go-jose/v4/jwt"
 	"github.com/pkg/errors"
 	"golang.org/x/net/context"
-	"gopkg.in/go-jose/go-jose.v2"
-	"gopkg.in/go-jose/go-jose.v2/jwt"
 
 	"github.com/metal-toolbox/rivets/v2/ginauth"
 )
@@ -154,7 +154,7 @@ func (m *Middleware) VerifyToken(c *gin.Context) (ginauth.ClaimMetadata, error) 
 
 	rawToken := authHeaderParts[1]
 
-	tok, err := jwt.ParseSigned(rawToken)
+	tok, err := jwt.ParseSigned(rawToken, []jose.SignatureAlgorithm{jose.RS256})
 	if err != nil {
 		return ginauth.ClaimMetadata{}, ginauth.NewAuthenticationError("unable to parse auth token")
 	}
@@ -176,9 +176,9 @@ func (m *Middleware) VerifyToken(c *gin.Context) (ginauth.ClaimMetadata, error) 
 	}
 
 	err = cl.Validate(jwt.Expected{
-		Issuer:   m.config.Issuer,
-		Audience: jwt.Audience{m.config.Audience},
-		Time:     time.Now(),
+		Issuer:      m.config.Issuer,
+		AnyAudience: jwt.Audience{m.config.Audience},
+		Time:        time.Now(),
 	})
 	if err != nil {
 		return ginauth.ClaimMetadata{}, ginauth.NewTokenValidationError(err)
