@@ -21,7 +21,7 @@ require (
 	go.opentelemetry.io/otel/sdk v1.28.0
 	go.opentelemetry.io/otel/trace v1.32.0
 	golang.org/x/exp v0.0.0-20241108190413-2d47ceb2692f
-	golang.org/x/net v0.31.0
+	golang.org/x/net v0.33.0
 )
 
 require github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
