@@ -6,6 +6,7 @@ toolchain go1.23.1
 
 require (
 	github.com/gin-gonic/gin v1.10.0
+	github.com/go-jose/go-jose/v4 v4.0.4
 	github.com/google/uuid v1.6.0
 	github.com/hashicorp/go-multierror v1.1.1
 	github.com/metal-toolbox/bmc-common v1.0.2
@@ -21,7 +22,6 @@ require (
 	go.opentelemetry.io/otel/trace v1.32.0
 	golang.org/x/exp v0.0.0-20241108190413-2d47ceb2692f
 	golang.org/x/net v0.31.0
-	gopkg.in/go-jose/go-jose.v2 v2.6.3
 )
 
 require github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
