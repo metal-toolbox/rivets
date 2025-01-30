@@ -9,7 +9,7 @@ require (
 	github.com/go-jose/go-jose/v4 v4.0.4
 	github.com/google/uuid v1.6.0
 	github.com/hashicorp/go-multierror v1.1.1
-	github.com/metal-toolbox/bmc-common v1.0.2
+	github.com/metal-toolbox/bmc-common v1.0.3
 	github.com/nats-io/nats-server/v2 v2.10.22
 	github.com/nats-io/nats.go v1.38.0
 	github.com/pkg/errors v0.9.1
