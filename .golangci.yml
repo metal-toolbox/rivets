@@ -1,7 +1,5 @@
 # golangci.com configuration
 # https://github.com/golangci/golangci/wiki/Configuration
-service:
-  golangci-lint-version: 1.60.0 # use the fixed version to not introduce new linters unexpectedly
 
 run:
   build-tags:
@@ -9,8 +7,6 @@ run:
 
 linters-settings:
   govet:
-    enable:
-    auto-fix: true
     settings:
       printf:
         funcs:
@@ -18,8 +14,6 @@ linters-settings:
           - (github.com/golangci/golangci-lint/pkg/logutils.Log).Warnf
           - (github.com/golangci/golangci-lint/pkg/logutils.Log).Errorf
           - (github.com/golangci/golangci-lint/pkg/logutils.Log).Fatalf
-  revive:
-    min-confidence: 0
   gocyclo:
     min-complexity: 12
   dupl:
@@ -29,7 +23,6 @@ linters-settings:
     min-occurrences: 2
   misspell:
     locale: US
-    auto-fix: true
   lll:
     line-length: 140
   goimports:
@@ -43,8 +36,6 @@ linters-settings:
       - wrapperFunc
   gofumpt:
     extra-rules: true
-  wsl:
-    auto-fix: true
 
 linters:
   enable:
@@ -70,10 +61,20 @@ linters:
     - noctx
     - stylecheck
     - gosec
+    - contextcheck
+    - durationcheck
+    - errchkjson
+#    - errorlint
+    - gochecksumtype
+    - nilerr
+    - reassign
+    - whitespace
   enable-all: false
   disable-all: true
 
 issues:
+  exclude-files:
+    - "(.*/)*.*_test.go"
   exclude-dirs:
     - internal/fixtures
   exclude-rules:
@@ -84,7 +85,6 @@ issues:
     - linters:
         - stylecheck
       text: "ST1016"
-
   exclude:
     # Default excludes from `golangci-lint run --help` with EXC0002 removed
     # EXC0001 errcheck: Almost all programs ignore errors on these functions and in most cases it's ok
@@ -107,6 +107,3 @@ issues:
     - (Expect directory permissions to be 0750 or less|Expect file permissions to be 0600 or less)
     # EXC0010 gosec: False positive is triggered by 'src, err := ioutil.ReadFile(filename)'
     - Potential file inclusion via variable
-exclude-use-default: false
-
-shadow: true
