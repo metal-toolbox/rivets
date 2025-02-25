@@ -14,7 +14,7 @@ import (
 	"github.com/metal-toolbox/rivets/v2/events/registry"
 	"github.com/nats-io/nats-server/v2/server"
 	srvtest "github.com/nats-io/nats-server/v2/test"
-	"github.com/nats-io/nats.go"
+	nats "github.com/nats-io/nats.go"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
