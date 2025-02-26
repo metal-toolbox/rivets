@@ -38,8 +38,10 @@ type BiosControlTaskParameters struct {
 	// Needed for BiosControlAction.SetConfig
 	//
 	// Required: false
-	BiosConfigURL *url.URL `json:"bios_config_url,omitempty"`
+	BiosConfigURL *ConfigURL `json:"bios_config_url,omitempty"`
 }
+
+type ConfigURL url.URL
 
 func (p *BiosControlTaskParameters) Unmarshal(r json.RawMessage) error {
 	return json.Unmarshal(r, p)
@@ -57,7 +59,7 @@ func (p *BiosControlTaskParameters) MustJSON() []byte {
 	return byt
 }
 
-func NewBiosControlTaskParameters(assetID uuid.UUID, action BiosControlAction, configURL *url.URL) *BiosControlTaskParameters {
+func NewBiosControlTaskParameters(assetID uuid.UUID, action BiosControlAction, configURL *ConfigURL) *BiosControlTaskParameters {
 	return &BiosControlTaskParameters{
 		AssetID:       assetID,
 		Action:        action,
