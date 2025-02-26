@@ -19,9 +19,3 @@ func (u *ConfigURL) UnmarshalJSON(data []byte) error {
 	*u = ConfigURL(*parsedURL)
 	return nil
 }
-
-// nolint: gocritic
-func (u ConfigURL) MarshalJSON() ([]byte, error) {
-	parsedURL := url.URL(u)
-	return json.Marshal(parsedURL.String())
-}
