@@ -5,7 +5,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/nats-io/nats.go"
+	nats "github.com/nats-io/nats.go"
 	"github.com/stretchr/testify/require"
 )
 

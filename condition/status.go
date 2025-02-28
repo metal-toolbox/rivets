@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/metal-toolbox/rivets/v2/events/registry"
-	"github.com/nats-io/nats.go"
+	nats "github.com/nats-io/nats.go"
 	"github.com/pkg/errors"
 )
 

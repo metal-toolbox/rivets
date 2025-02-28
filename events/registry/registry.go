@@ -12,7 +12,7 @@ import (
 	"errors"
 	"time"
 
-	"github.com/nats-io/nats.go"
+	nats "github.com/nats-io/nats.go"
 
 	"github.com/metal-toolbox/rivets/v2/events"
 	"github.com/metal-toolbox/rivets/v2/events/pkg/kv"

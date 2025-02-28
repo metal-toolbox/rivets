@@ -3,7 +3,7 @@ package events
 import (
 	"time"
 
-	"github.com/nats-io/nats.go"
+	nats "github.com/nats-io/nats.go"
 	"github.com/pkg/errors"
 	"golang.org/x/exp/slices"
 )

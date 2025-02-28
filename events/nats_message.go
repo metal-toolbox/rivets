@@ -4,7 +4,7 @@ package events
 import (
 	"context"
 
-	"github.com/nats-io/nats.go"
+	nats "github.com/nats-io/nats.go"
 	"github.com/pkg/errors"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/propagation"

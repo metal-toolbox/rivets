@@ -15,7 +15,7 @@ import (
 
 	"github.com/nats-io/nats-server/v2/server"
 	srvtest "github.com/nats-io/nats-server/v2/test"
-	"github.com/nats-io/nats.go"
+	nats "github.com/nats-io/nats.go"
 )
 
 // XXX: this will panic on an error
