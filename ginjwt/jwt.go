@@ -148,7 +148,7 @@ func (m *Middleware) VerifyToken(c *gin.Context) (ginauth.ClaimMetadata, error) 
 
 	authHeaderParts := strings.SplitN(authHeader, " ", expectedAuthHeaderParts)
 
-	if !(len(authHeaderParts) == expectedAuthHeaderParts && strings.EqualFold(authHeaderParts[0], "bearer")) {
+	if len(authHeaderParts) != expectedAuthHeaderParts || !strings.EqualFold(authHeaderParts[0], "bearer") {
 		return ginauth.ClaimMetadata{}, ginauth.NewAuthenticationError("invalid authorization header, expected format: \"Bearer token\"")
 	}
 
