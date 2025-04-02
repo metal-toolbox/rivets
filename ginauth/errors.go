@@ -35,7 +35,7 @@ type AuthError struct {
 func NewAuthenticationError(msg string) *AuthError {
 	return &AuthError{
 		HTTPErrorCode: http.StatusUnauthorized,
-		//nolint:goerr113 // it must be dynamic here
+		//nolint:err113 // it must be dynamic here
 		err: errors.New(msg),
 	}
 }
@@ -55,7 +55,7 @@ func NewAuthenticationErrorFrom(err error) *AuthError {
 func NewAuthorizationError(msg string) *AuthError {
 	return &AuthError{
 		HTTPErrorCode: http.StatusForbidden,
-		//nolint:goerr113 // it must be dynamic here
+		//nolint:err113 // it must be dynamic here
 		err: errors.New(msg),
 	}
 }

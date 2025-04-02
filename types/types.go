@@ -64,6 +64,7 @@ func (c Components) ByNameModel(cSlug string, cModels []string) *Component {
 // Server is a generic server  type
 type Server struct {
 	UpdatedAt   time.Time         `json:"updated,omitempty"`
+	DeletedAt   *time.Time        `json:"deleted_at,omitempty"`
 	BIOSCfg     map[string]string `json:"bios_cfg,omitempty"`
 	ID          string            `json:"id,omitempty"`
 	Facility    string            `json:"facility,omitempty"`
