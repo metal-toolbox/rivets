@@ -15,7 +15,7 @@ jobs:
       uses: golangci/golangci-lint-action@v7
       with:
         args: --config .golangci.yml --timeout 2m
-        version: v2.0.2
+        version: v2.13.2
 
   build-test:
     runs-on: ubuntu-latest
